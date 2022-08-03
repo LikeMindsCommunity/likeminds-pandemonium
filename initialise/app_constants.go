@@ -55,7 +55,7 @@ const EnvVarDbHost = "DatabaseHost"
 const EnvVarDbPort = "DatabasePort"
 
 // EnvVarDbName depicts application host var string key
-const EnvVarDbName = "DatabaseDBName"
+const EnvVarDbName = "DatabaseDbName"
 
 // EnvVarDbUser depicts application host var string key
 const EnvVarDbUser = "DatabaseUser"

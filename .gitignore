@@ -17,5 +17,5 @@
 # Application environment file
 .env
 
-# Editor created files
+# Editor created folders and files
 .vscode/*
