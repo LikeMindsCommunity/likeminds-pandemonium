@@ -1,4 +1,4 @@
-eviewer's Checklist:
+Reviewer's Checklist:
 - [ ] Jira ticket attached 
 - [ ] Pull Request title has Jira Ticket Id prefix
 - [ ] Description added for code changes
