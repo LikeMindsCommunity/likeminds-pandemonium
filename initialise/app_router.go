@@ -1,6 +1,7 @@
 package initialise
 
 import (
+	"github.com/NateshR/Likeminds-Real-Time/socketchk"
 	"github.com/NateshR/Likeminds-Real-Time/statuschk"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -56,4 +57,5 @@ func enableCors() cors.Config {
 
 func addRouterRoutes(appRouter AppRouter) {
 	statuschk.Router(appRouter.router)
+	socketchk.Router(appRouter.router)
 }
