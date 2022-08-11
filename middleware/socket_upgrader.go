@@ -8,8 +8,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// SocketConnectionUpgrader upgrades http connection to websocket connection
-func SocketConnectionUpgrader() gin.HandlerFunc {
+// HttpConnectionUpgrader upgrades http connection to websocket connection
+func HttpConnectionUpgrader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {

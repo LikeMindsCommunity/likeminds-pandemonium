@@ -9,6 +9,6 @@ import (
 func Router(router *gin.Engine) {
 	socketChkRoute := router.Group("/socket")
 	{
-		socketChkRoute.GET("", middleware.SocketConnectionUpgrader(), GetSocketStatus)
+		socketChkRoute.GET("", middleware.HttpConnectionUpgrader(), GetSocketStatus)
 	}
 }
