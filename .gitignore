@@ -1,3 +1,6 @@
+.vscode
+.idea
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -13,3 +16,21 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+#Go build binary
+likeminds-pandemonium
+
+#Environment file
+.env
+
+# Ignore DS Store files
+*.DS_Store
+
+# Ignore build files
+_build/
+
+# Ignore debug files
+__debug_bin
+
+# Ignore IDE files
+.vscode
