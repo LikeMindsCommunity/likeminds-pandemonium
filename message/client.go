@@ -9,10 +9,10 @@ import (
 
 const (
 	// Max wait time when writing message to peer
-	writeWait = 10 * time.Second
+	writeWait = 20 * time.Second
 
 	// Max time till next pong from peer
-	pongWait = 60 * time.Second
+	pongWait = 6 * time.Second
 
 	// Send ping interval, must be less then pong wait time
 	pingPeriod = (pongWait * 9) / 10
@@ -43,6 +43,7 @@ func newClient(conn *websocket.Conn, wsServer *WsServer) *Client {
 	return &Client{
 		conn:     conn,
 		wsServer: wsServer,
+		send:     make(chan []byte, 256),
 	}
 }
 

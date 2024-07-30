@@ -13,6 +13,7 @@ func NewWebsocketServer() *WsServer {
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		broadcast:  make(chan []byte),
 	}
 }
 
