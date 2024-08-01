@@ -9,10 +9,10 @@ import (
 
 const (
 	// Max wait time when writing message to peer
-	writeWait = 20 * time.Second
+	writeWait = 10 * time.Second
 
 	// Max time till next pong from peer
-	pongWait = 6 * time.Second
+	pongWait = 60 * time.Second
 
 	// Send ping interval, must be less then pong wait time
 	pingPeriod = (pongWait * 9) / 10
@@ -23,7 +23,6 @@ const (
 
 var (
 	newline = []byte{'\n'}
-	space   = []byte{' '}
 )
 
 // Client represents the websocket client at the server
@@ -70,6 +69,29 @@ func (client *Client) disconnect() {
 	client.conn.Close()
 }
 
+func (client *Client) readPump() {
+	defer func() {
+		client.disconnect()
+	}()
+
+	//client.conn.SetReadLimit(maxMessageSize)
+	client.conn.SetReadDeadline(time.Now().Add(pongWait))
+	client.conn.SetPongHandler(func(string) error { client.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+
+	// Start endless read loop, waiting for messages from client
+	for {
+		_, jsonMessage, err := client.conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("unexpected close error: %v", err)
+			}
+			break
+		}
+
+		client.wsServer.broadcast <- jsonMessage
+	}
+}
+
 func (client *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -108,28 +130,5 @@ func (client *Client) writePump() {
 				return
 			}
 		}
-	}
-}
-
-func (client *Client) readPump() {
-	defer func() {
-		client.disconnect()
-	}()
-
-	client.conn.SetReadLimit(maxMessageSize)
-	client.conn.SetReadDeadline(time.Now().Add(pongWait))
-	client.conn.SetPongHandler(func(string) error { client.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
-
-	// Start endless read loop, waiting for messages from client
-	for {
-		_, jsonMessage, err := client.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("unexpected close error: %v", err)
-			}
-			break
-		}
-
-		client.wsServer.broadcast <- jsonMessage
 	}
 }

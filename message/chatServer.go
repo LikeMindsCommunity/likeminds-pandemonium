@@ -21,7 +21,6 @@ func NewWebsocketServer() *WsServer {
 func (server *WsServer) Run() {
 	for {
 		select {
-
 		case client := <-server.register:
 			server.registerClient(client)
 
