@@ -1,7 +1,9 @@
 package message
 
 import (
+	"context"
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
 	"time"
@@ -23,6 +25,7 @@ const (
 
 var (
 	newline = []byte{'\n'}
+	ctx     = context.Background()
 )
 
 // Client represents the websocket client at the server
@@ -37,6 +40,12 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 }
+
+var redisClient = redis.NewClient(&redis.Options{
+	Addr:     "localhost:6379",
+	Password: "", // no password set
+	DB:       0,  // use default DB
+})
 
 func newClient(conn *websocket.Conn, wsServer *WsServer) *Client {
 	return &Client{
@@ -87,20 +96,25 @@ func (client *Client) readPump() {
 			}
 			break
 		}
-
-		client.wsServer.broadcast <- jsonMessage
+		if err := redisClient.Publish(ctx, "channel", jsonMessage).Err(); err != nil {
+			log.Println("Publish error:", err)
+			return
+		}
+		//client.wsServer.broadcast <- jsonMessage
 	}
 }
 
 func (client *Client) writePump() {
+	sub := redisClient.Subscribe(ctx, "channel")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
 		client.conn.Close()
+		sub.Close()
 	}()
 	for {
 		select {
-		case message, ok := <-client.send:
+		case message, ok := <-sub.Channel():
 			client.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The WsServer closed the channel.
@@ -112,7 +126,7 @@ func (client *Client) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			w.Write([]byte(message.Payload))
 
 			// Attach queued chat messages to the current websocket message.
 			n := len(client.send)
