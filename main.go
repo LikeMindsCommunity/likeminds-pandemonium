@@ -14,16 +14,14 @@ var (
 func main() {
 	initGin()
 
-	//wsServer := message.NewWebsocketServer()
-	//go wsServer.Run()
-	//http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-	//	message.ServeWs(wsServer, w, r)
-	//})
-
+	// ChatroomListen GET request
 	router.GET(utility.ChatroomListen, chatroom.WsHandler())
+
+	// start server
 	log.Fatal(router.Run(":8080"))
 }
 
+// initGin to initialise Gin network module
 func initGin() {
 	gin.SetMode(gin.ReleaseMode)
 	router = gin.Default()

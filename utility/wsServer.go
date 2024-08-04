@@ -2,15 +2,15 @@ package utility
 
 import "github.com/gorilla/websocket"
 
-// Client represents the websocket client at the server
+// Client represents the websocket client connected with the server
 type Client struct {
 	// The actual websocket connection.
 	Conn *websocket.Conn
-
+	// Server to which client is connected
 	WsServer *WsServer
-	Send     chan []byte
 }
 
+// WsServer represents web socket server
 type WsServer struct {
 	clients    map[*Client]bool
 	Register   chan *Client
@@ -18,11 +18,11 @@ type WsServer struct {
 	Broadcast  chan []byte
 }
 
+// NewClient creates new client which will be added to WsServer
 func NewClient(conn *websocket.Conn, wsServer *WsServer) *Client {
 	return &Client{
 		Conn:     conn,
 		WsServer: wsServer,
-		Send:     make(chan []byte, 256),
 	}
 }
 
@@ -42,32 +42,25 @@ func (server *WsServer) Run() {
 		select {
 		case client := <-server.Register:
 			server.registerClient(client)
-
 		case client := <-server.Unregister:
 			server.unregisterClient(client)
-
-		case message := <-server.Broadcast:
-			server.broadcastToClients(message)
 		}
 	}
 }
 
+// registerClient to register client on WsServer
 func (server *WsServer) registerClient(client *Client) {
 	server.clients[client] = true
 }
 
+// unregisterClient to unregister client on WsServer
 func (server *WsServer) unregisterClient(client *Client) {
 	if _, ok := server.clients[client]; ok {
 		delete(server.clients, client)
 	}
 }
 
-func (server *WsServer) broadcastToClients(message []byte) {
-	for client := range server.clients {
-		client.Send <- message
-	}
-}
-
+// GetClientsCount to return clients count connected on WsServer
 func (server *WsServer) GetClientsCount() int {
 	return len(server.clients)
 }
