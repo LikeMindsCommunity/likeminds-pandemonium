@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type ChatroomWsServer struct {
+type WsServer struct {
 	wsServers map[string]*utility.WsServer
 }
 
@@ -24,8 +24,8 @@ var (
 )
 
 // newChatroomWsServer creates a new Chatroom WsServer type
-func newChatroomWsServer() *ChatroomWsServer {
-	return &ChatroomWsServer{
+func newChatroomWsServer() *WsServer {
+	return &WsServer{
 		wsServers: make(map[string]*utility.WsServer),
 	}
 }
