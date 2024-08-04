@@ -5,7 +5,8 @@ import "github.com/gorilla/websocket"
 // Client represents the websocket client at the server
 type Client struct {
 	// The actual websocket connection.
-	Conn     *websocket.Conn
+	Conn *websocket.Conn
+
 	WsServer *WsServer
 	Send     chan []byte
 }
@@ -65,4 +66,8 @@ func (server *WsServer) broadcastToClients(message []byte) {
 	for client := range server.clients {
 		client.Send <- message
 	}
+}
+
+func (server *WsServer) GetClientsCount() int {
+	return len(server.clients)
 }

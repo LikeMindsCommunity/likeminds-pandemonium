@@ -12,7 +12,7 @@ import (
 )
 
 type ChatroomWsServer struct {
-	chatroomWsServers map[string]*utility.WsServer
+	wsServers map[string]*utility.WsServer
 }
 
 var chatroomWsServer = newChatroomWsServer()
@@ -36,7 +36,7 @@ var redisClient = redis.NewClient(&redis.Options{
 // newChatroomWsServer creates a new WsServer type
 func newChatroomWsServer() *ChatroomWsServer {
 	return &ChatroomWsServer{
-		chatroomWsServers: make(map[string]*utility.WsServer),
+		wsServers: make(map[string]*utility.WsServer),
 	}
 }
 
@@ -44,12 +44,12 @@ func WsHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var wsServer *utility.WsServer
 		chatroomID := c.Query("chatroom_id")
-		if _, ok := chatroomWsServer.chatroomWsServers[chatroomID]; ok {
-			wsServer = chatroomWsServer.chatroomWsServers[chatroomID]
+		if _, ok := chatroomWsServer.wsServers[chatroomID]; ok {
+			wsServer = chatroomWsServer.wsServers[chatroomID]
 		} else {
 			wsServer = utility.NewWebsocketServer()
-			chatroomWsServer.chatroomWsServers[chatroomID] = wsServer
-
+			go wsServer.Run()
+			chatroomWsServer.wsServers[chatroomID] = wsServer
 		}
 		ServeWs(chatroomID, wsServer, c.Writer, c.Request)
 	}
@@ -72,15 +72,22 @@ func ServeWs(chatroomID string, wsServer *utility.WsServer, w http.ResponseWrite
 	wsServer.Register <- client
 }
 
-func disconnect(client *utility.Client) {
-	client.WsServer.Unregister <- client
+func disconnect(chatroomID string, client *utility.Client) {
+	unregisterFromServer(chatroomID, client)
 	close(client.Send)
 	client.Conn.Close()
 }
 
+func unregisterFromServer(chatroomID string, client *utility.Client) {
+	client.WsServer.Unregister <- client
+	if client.WsServer.GetClientsCount() <= 1 {
+		delete(chatroomWsServer.wsServers, chatroomID)
+	}
+}
+
 func readPump(chatroomID string, client *utility.Client) {
 	defer func() {
-		disconnect(client)
+		disconnect(chatroomID, client)
 	}()
 
 	//client.conn.SetReadLimit(maxMessageSize)
