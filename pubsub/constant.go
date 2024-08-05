@@ -1,4 +1,4 @@
-package redisPandemonium
+package pubsub
 
 const (
 	RedisClient = "redis_client"

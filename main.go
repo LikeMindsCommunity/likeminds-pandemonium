@@ -2,43 +2,33 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/chatroom"
-	"likeminds-pandemonium/redisPandemonium"
+	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/pubsub"
 	"log"
 )
 
 var (
-	router      *gin.Engine
-	redisClient *redis.Client
+	router *gin.Engine
 )
 
 func main() {
 	initGin()
-	initRedisClient()
+	redisClient := pubsub.InitRedisClient()
 
-	router.Use(redisPandemonium.ApiMiddleware(redisClient))
+	router.Use(pubsub.ApiMiddleware(redisClient))
 	// ChatroomListen GET request
 	router.GET(constant.ChatroomListen, chatroom.WsHandler())
-	// Redis publish / subscribe APIs
-	router.POST(constant.RedisPublish, redisPandemonium.Publish)
+	// PubSub publish / subscribe APIs
+	router.POST(constant.RedisPublish, pubsub.Publish)
 
 	// start server
-	log.Fatal(router.Run(":8080"))
+	log.Fatal(router.Run(common.GoDotEnvVariable("Ws_SERVER_PORT")))
 }
 
 // initGin to initialise Gin network module
 func initGin() {
-	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(common.GoDotEnvVariable("GIN_MODE"))
 	router = gin.Default()
-}
-
-// initRedisClient creates a new Redis Client
-func initRedisClient() {
-	redisClient = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
-	"likeminds-pandemonium/redisPandemonium"
+	"likeminds-pandemonium/pubsub"
 	"likeminds-pandemonium/ws"
 	"log"
 	"net/http"
@@ -46,7 +46,7 @@ func WsHandler() gin.HandlerFunc {
 		if chatroomID == "" || chatroomID == "null" {
 			return
 		}
-		topic := fmt.Sprintf(redisPandemonium.TopicChatroom, chatroomID)
+		topic := fmt.Sprintf(pubsub.TopicChatroom, chatroomID)
 		if _, ok := chatroomWsServer.wsServers[topic]; ok {
 			wsServer = chatroomWsServer.wsServers[topic]
 		} else {
@@ -54,7 +54,7 @@ func WsHandler() gin.HandlerFunc {
 			go wsServer.Run()
 			chatroomWsServer.wsServers[topic] = wsServer
 		}
-		redisClient := redisPandemonium.GetRedisClientFromContext(c)
+		redisClient := pubsub.GetRedisClientFromContext(c)
 		ServeWs(topic, wsServer, c.Writer, c.Request, redisClient)
 	}
 }
@@ -124,7 +124,7 @@ func readPump(topic string, client *ws.Client, redisClient *redis.Client) {
 			}
 			break
 		}
-		// publish jsonMessage to redisPandemonium TopicChatroom
+		// publish jsonMessage to pubsub TopicChatroom
 		if err := redisClient.Publish(ctx, topic, jsonMessage).Err(); err != nil {
 			log.Println("Publish error:", err)
 			return
@@ -134,7 +134,7 @@ func readPump(topic string, client *ws.Client, redisClient *redis.Client) {
 
 // writePump to send message from server to client
 func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
-	// subscribe to redisPandemonium TopicChatroom
+	// subscribe to pubsub TopicChatroom
 	sub := redisClient.Subscribe(ctx, topic)
 	// start ticker at regular interval of PingPeriod
 	ticker := time.NewTicker(ws.PingPeriod)
@@ -146,7 +146,7 @@ func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
 		if err != nil {
 			return
 		}
-		// stop listening to redisPandemonium TopicChatroom
+		// stop listening to pubsub TopicChatroom
 		err = sub.Close()
 		if err != nil {
 			return

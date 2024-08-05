@@ -1,0 +1,19 @@
+services:
+  pubsub:
+    image: redis
+    container_name: pubsub
+    hostname: pubsub
+    ports:
+      - 6380:6380
+    volumes:
+      - ./pubsub/redis.conf:/usr/local/etc/redis/redis.conf
+    restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+  pandemonium:
+    container_name: pandemonium
+    hostname: pandemonium
+    build:
+      dockerfile: ./Dockerfile.pandemonium-local
+    ports:
+      - 8081:8081
+    restart: always
