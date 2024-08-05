@@ -1,4 +1,4 @@
-package utility
+package ws
 
 import "time"
 
@@ -11,7 +11,4 @@ const (
 
 	// PingPeriod Send ping interval, must be less then pong wait time
 	PingPeriod = (PongWait * 9) / 10
-)
-const (
-	ChatroomListen = "/chatroom/listen"
 )

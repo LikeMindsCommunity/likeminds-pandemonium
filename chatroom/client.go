@@ -5,28 +5,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
-	"likeminds-pandemonium/utility"
+	"likeminds-pandemonium/redisPandemonium"
+	"likeminds-pandemonium/ws"
 	"log"
 	"net/http"
 	"time"
 )
 
 type WsServer struct {
-	wsServers map[string]*utility.WsServer
+	wsServers map[string]*ws.WsServer
 }
 
 var (
-	newline          = []byte{'\n'}
 	ctx              = context.Background()
 	chatroomWsServer = newChatroomWsServer()
 	upgrader         = newUpgrader()
-	redisClient      = newRedisClient()
 )
 
 // newChatroomWsServer creates a new Chatroom WsServer type
 func newChatroomWsServer() *WsServer {
 	return &WsServer{
-		wsServers: make(map[string]*utility.WsServer),
+		wsServers: make(map[string]*ws.WsServer),
 	}
 }
 
@@ -38,49 +37,44 @@ func newUpgrader() websocket.Upgrader {
 	}
 }
 
-// newRedisClient creates a new Redis Client
-func newRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-}
-
 // WsHandler returns custom Chatroom gin.HandlerFunc. Create/Get WsServer w.r.t chatroom_id
 func WsHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var wsServer *utility.WsServer
+		var wsServer *ws.WsServer
 		chatroomID := c.Query("chatroom_id")
+		if chatroomID == "" || chatroomID == "null" {
+			return
+		}
 		if _, ok := chatroomWsServer.wsServers[chatroomID]; ok {
 			wsServer = chatroomWsServer.wsServers[chatroomID]
 		} else {
-			wsServer = utility.NewWebsocketServer()
+			wsServer = ws.NewWebsocketServer()
 			go wsServer.Run()
 			chatroomWsServer.wsServers[chatroomID] = wsServer
 		}
-		ServeWs(chatroomID, wsServer, c.Writer, c.Request)
+		redisClient := redisPandemonium.GetRedisClientFromContext(c)
+		ServeWs(chatroomID, wsServer, c.Writer, c.Request, redisClient)
 	}
 }
 
 // ServeWs handles websocket requests of a chatroom from clients requests.
-func ServeWs(chatroomID string, wsServer *utility.WsServer, w http.ResponseWriter, r *http.Request) {
+func ServeWs(chatroomID string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	client := utility.NewClient(conn, wsServer)
+	client := ws.NewClient(conn, wsServer)
 
-	go writePump(chatroomID, client)
-	go readPump(chatroomID, client)
+	go writePump(chatroomID, client, redisClient)
+	go readPump(chatroomID, client, redisClient)
 
 	wsServer.Register <- client
 }
 
 // disconnect closes connection and clears client
-func disconnect(chatroomID string, client *utility.Client) {
+func disconnect(chatroomID string, client *ws.Client) {
 	unregisterFromServer(chatroomID, client)
 	err := client.Conn.Close()
 	if err != nil {
@@ -89,7 +83,7 @@ func disconnect(chatroomID string, client *utility.Client) {
 }
 
 // unregisterFromServer to remove client from WsServer and delete WsServer from ChatroomWsServer if last client left
-func unregisterFromServer(chatroomID string, client *utility.Client) {
+func unregisterFromServer(chatroomID string, client *ws.Client) {
 	client.WsServer.Unregister <- client
 	if client.WsServer.GetClientsCount() <= 1 {
 		delete(chatroomWsServer.wsServers, chatroomID)
@@ -97,7 +91,7 @@ func unregisterFromServer(chatroomID string, client *utility.Client) {
 }
 
 // readPump to read incoming message from client
-func readPump(chatroomID string, client *utility.Client) {
+func readPump(chatroomID string, client *ws.Client, redisClient *redis.Client) {
 	defer func() {
 		// disconnect client after exit from for loop
 		disconnect(chatroomID, client)
@@ -105,14 +99,14 @@ func readPump(chatroomID string, client *utility.Client) {
 
 	//client.conn.SetReadLimit(maxMessageSize)
 	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
-	err := client.Conn.SetReadDeadline(time.Now().Add(utility.PongWait))
+	err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 	if err != nil {
 		return
 	}
 	// set SetPongHandler to read incoming "ping" message through ticker. Used to increase SetReadDeadline
 	client.Conn.SetPongHandler(func(string) error {
 		// update SetReadDeadline to time.Now() + PongWait
-		err := client.Conn.SetReadDeadline(time.Now().Add(utility.PongWait))
+		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 		if err != nil {
 			return err
 		}
@@ -128,7 +122,7 @@ func readPump(chatroomID string, client *utility.Client) {
 			}
 			break
 		}
-		// publish jsonMessage to redis channel:<chatroomID>
+		// publish jsonMessage to redisPandemonium channel:<chatroomID>
 		if err := redisClient.Publish(ctx, chatroomID, jsonMessage).Err(); err != nil {
 			log.Println("Publish error:", err)
 			return
@@ -137,11 +131,11 @@ func readPump(chatroomID string, client *utility.Client) {
 }
 
 // writePump to send message from server to client
-func writePump(chatroomID string, client *utility.Client) {
-	// subscribe to redis channel:<chatroomID>
+func writePump(chatroomID string, client *ws.Client, redisClient *redis.Client) {
+	// subscribe to redisPandemonium channel:<chatroomID>
 	sub := redisClient.Subscribe(ctx, chatroomID)
 	// start ticker at regular interval of PingPeriod
-	ticker := time.NewTicker(utility.PingPeriod)
+	ticker := time.NewTicker(ws.PingPeriod)
 	defer func() {
 		// stop ticker
 		ticker.Stop()
@@ -150,7 +144,7 @@ func writePump(chatroomID string, client *utility.Client) {
 		if err != nil {
 			return
 		}
-		// stop listening to redis channel:<chatroomID>
+		// stop listening to redisPandemonium channel:<chatroomID>
 		err = sub.Close()
 		if err != nil {
 			return
@@ -160,7 +154,7 @@ func writePump(chatroomID string, client *utility.Client) {
 		select {
 		case message, ok := <-sub.Channel():
 			// SetWriteDeadline to time.Now() + WriteWait
-			err := client.Conn.SetWriteDeadline(time.Now().Add(utility.WriteWait))
+			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
 			if err != nil {
 				return
 			}
@@ -186,7 +180,7 @@ func writePump(chatroomID string, client *utility.Client) {
 			}
 		case <-ticker.C:
 			// At regular interval of PingPeriod, update SetWriteDeadline to time.Now() + WriteWait
-			err := client.Conn.SetWriteDeadline(time.Now().Add(utility.WriteWait))
+			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
 			if err != nil {
 				return
 			}
