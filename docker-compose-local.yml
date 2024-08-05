@@ -9,6 +9,8 @@ services:
       - ./pubsub/redis.conf:/usr/local/etc/redis/redis.conf
     restart: always
     command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - local_pandemonium
   pandemonium:
     container_name: pandemonium
     hostname: pandemonium
@@ -17,3 +19,9 @@ services:
     ports:
       - 8081:8081
     restart: always
+    networks:
+      - local_pandemonium
+networks:
+  local_pandemonium:
+    name: likeminds-authentication_local_auth
+    external: true
