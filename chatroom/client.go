@@ -2,6 +2,7 @@ package chatroom
 
 import (
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
@@ -45,20 +46,21 @@ func WsHandler() gin.HandlerFunc {
 		if chatroomID == "" || chatroomID == "null" {
 			return
 		}
-		if _, ok := chatroomWsServer.wsServers[chatroomID]; ok {
-			wsServer = chatroomWsServer.wsServers[chatroomID]
+		topic := fmt.Sprintf(redisPandemonium.TopicChatroom, chatroomID)
+		if _, ok := chatroomWsServer.wsServers[topic]; ok {
+			wsServer = chatroomWsServer.wsServers[topic]
 		} else {
 			wsServer = ws.NewWebsocketServer()
 			go wsServer.Run()
-			chatroomWsServer.wsServers[chatroomID] = wsServer
+			chatroomWsServer.wsServers[topic] = wsServer
 		}
 		redisClient := redisPandemonium.GetRedisClientFromContext(c)
-		ServeWs(chatroomID, wsServer, c.Writer, c.Request, redisClient)
+		ServeWs(topic, wsServer, c.Writer, c.Request, redisClient)
 	}
 }
 
 // ServeWs handles websocket requests of a chatroom from clients requests.
-func ServeWs(chatroomID string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) {
+func ServeWs(topic string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -67,15 +69,15 @@ func ServeWs(chatroomID string, wsServer *ws.WsServer, w http.ResponseWriter, r 
 
 	client := ws.NewClient(conn, wsServer)
 
-	go writePump(chatroomID, client, redisClient)
-	go readPump(chatroomID, client, redisClient)
+	go writePump(topic, client, redisClient)
+	go readPump(topic, client, redisClient)
 
 	wsServer.Register <- client
 }
 
 // disconnect closes connection and clears client
-func disconnect(chatroomID string, client *ws.Client) {
-	unregisterFromServer(chatroomID, client)
+func disconnect(topic string, client *ws.Client) {
+	unregisterFromServer(topic, client)
 	err := client.Conn.Close()
 	if err != nil {
 		return
@@ -83,18 +85,18 @@ func disconnect(chatroomID string, client *ws.Client) {
 }
 
 // unregisterFromServer to remove client from WsServer and delete WsServer from ChatroomWsServer if last client left
-func unregisterFromServer(chatroomID string, client *ws.Client) {
+func unregisterFromServer(topic string, client *ws.Client) {
 	client.WsServer.Unregister <- client
 	if client.WsServer.GetClientsCount() <= 1 {
-		delete(chatroomWsServer.wsServers, chatroomID)
+		delete(chatroomWsServer.wsServers, topic)
 	}
 }
 
 // readPump to read incoming message from client
-func readPump(chatroomID string, client *ws.Client, redisClient *redis.Client) {
+func readPump(topic string, client *ws.Client, redisClient *redis.Client) {
 	defer func() {
 		// disconnect client after exit from for loop
-		disconnect(chatroomID, client)
+		disconnect(topic, client)
 	}()
 
 	//client.conn.SetReadLimit(maxMessageSize)
@@ -122,8 +124,8 @@ func readPump(chatroomID string, client *ws.Client, redisClient *redis.Client) {
 			}
 			break
 		}
-		// publish jsonMessage to redisPandemonium channel:<chatroomID>
-		if err := redisClient.Publish(ctx, chatroomID, jsonMessage).Err(); err != nil {
+		// publish jsonMessage to redisPandemonium TopicChatroom
+		if err := redisClient.Publish(ctx, topic, jsonMessage).Err(); err != nil {
 			log.Println("Publish error:", err)
 			return
 		}
@@ -131,9 +133,9 @@ func readPump(chatroomID string, client *ws.Client, redisClient *redis.Client) {
 }
 
 // writePump to send message from server to client
-func writePump(chatroomID string, client *ws.Client, redisClient *redis.Client) {
-	// subscribe to redisPandemonium channel:<chatroomID>
-	sub := redisClient.Subscribe(ctx, chatroomID)
+func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
+	// subscribe to redisPandemonium TopicChatroom
+	sub := redisClient.Subscribe(ctx, topic)
 	// start ticker at regular interval of PingPeriod
 	ticker := time.NewTicker(ws.PingPeriod)
 	defer func() {
@@ -144,7 +146,7 @@ func writePump(chatroomID string, client *ws.Client, redisClient *redis.Client) 
 		if err != nil {
 			return
 		}
-		// stop listening to redisPandemonium channel:<chatroomID>
+		// stop listening to redisPandemonium TopicChatroom
 		err = sub.Close()
 		if err != nil {
 			return
