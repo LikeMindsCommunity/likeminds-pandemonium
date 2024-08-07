@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
+	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/pubsub"
 	"likeminds-pandemonium/ws"
 	"log"
@@ -41,12 +42,15 @@ func newUpgrader() websocket.Upgrader {
 // WsHandler returns custom Chatroom gin.HandlerFunc. Create/Get WsServer w.r.t chatroom_id
 func WsHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var wsServer *ws.WsServer
 		chatroomID := c.Query("chatroom_id")
-		if chatroomID == "" || chatroomID == "null" {
+		UUID := c.GetHeader(constant.HeadersMemberId)
+		deviceID := c.GetHeader(constant.HeadersDeviceId)
+		if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" || deviceID == "" || deviceID == "null" {
 			return
 		}
 		topic := fmt.Sprintf(pubsub.TopicChatroom, chatroomID)
+
+		var wsServer *ws.WsServer
 		if _, ok := chatroomWsServer.wsServers[topic]; ok {
 			wsServer = chatroomWsServer.wsServers[topic]
 		} else {
@@ -55,19 +59,19 @@ func WsHandler() gin.HandlerFunc {
 			chatroomWsServer.wsServers[topic] = wsServer
 		}
 		redisClient := pubsub.GetRedisClientFromContext(c)
-		ServeWs(topic, wsServer, c.Writer, c.Request, redisClient)
+		ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
 	}
 }
 
 // ServeWs handles websocket requests of a chatroom from clients requests.
-func ServeWs(topic string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) {
+func ServeWs(topic string, UUID string, deviceID string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	client := ws.NewClient(conn, wsServer)
+	client := ws.NewClient(conn, wsServer, UUID, deviceID)
 
 	go writePump(topic, client, redisClient)
 	go readPump(topic, client, redisClient)

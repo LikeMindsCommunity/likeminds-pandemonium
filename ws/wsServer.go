@@ -8,6 +8,10 @@ type Client struct {
 	Conn *websocket.Conn
 	// Server to which client is connected
 	WsServer *WsServer
+	// UUID of user
+	UUID string
+	// Device ID of user
+	DeviceID string
 }
 
 // WsServer represents web socket server
@@ -19,10 +23,12 @@ type WsServer struct {
 }
 
 // NewClient creates new client which will be added to WsServer
-func NewClient(conn *websocket.Conn, wsServer *WsServer) *Client {
+func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID string) *Client {
 	return &Client{
 		Conn:     conn,
 		WsServer: wsServer,
+		UUID:     UUID,
+		DeviceID: deviceID,
 	}
 }
 
