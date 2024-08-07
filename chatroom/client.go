@@ -2,6 +2,7 @@ package chatroom
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -16,6 +17,22 @@ import (
 
 type WsServer struct {
 	wsServers map[string]*ws.WsServer
+}
+
+type ConversationResponse struct {
+	Conversation Conversation `json:"conversation"`
+}
+
+type Conversation struct {
+	Member Member `json:"member"`
+}
+
+type Member struct {
+	SDKClientInfo SDKClientInfo `json:"sdk_client_info"`
+}
+
+type SDKClientInfo struct {
+	UUID string `json:"uuid"`
 }
 
 var (
@@ -172,12 +189,20 @@ func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
 				}
 				return
 			}
+			messagePayloadByte := []byte(message.Payload)
+			var conversationResponse ConversationResponse
+			if err := json.Unmarshal(messagePayloadByte, &conversationResponse); err != nil {
+				return
+			}
+			if conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID {
+				continue
+			}
 			// Create NextWriter of type websocket.TextMessage
 			w, err := client.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
 			}
-			_, err = w.Write([]byte(message.Payload))
+			_, err = w.Write(messagePayloadByte)
 			if err != nil {
 				return
 			}
