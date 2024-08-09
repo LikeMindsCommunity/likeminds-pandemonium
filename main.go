@@ -4,8 +4,8 @@ import (
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/chatroom"
 	"likeminds-pandemonium/common"
-	"likeminds-pandemonium/init"
 	"likeminds-pandemonium/pubsub"
+	"likeminds-pandemonium/web"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +21,7 @@ func main() {
 
 	router.Use(pubsub.ApiMiddleware(redisClient))
 	// Application health check GET path
-	router.GET("", init.HealthCheck)
+	router.GET("", web.Home)
 	// ChatroomListen GET request
 	router.GET(constant.ChatroomListen, chatroom.WsHandler())
 	// PubSub publish / subscribe APIs
