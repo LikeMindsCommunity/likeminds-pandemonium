@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/chatroom"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/init"
 	"likeminds-pandemonium/pubsub"
 	"log"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -18,6 +20,8 @@ func main() {
 	redisClient := pubsub.InitRedisClient()
 
 	router.Use(pubsub.ApiMiddleware(redisClient))
+	// Application health check GET path
+	router.GET("", init.HealthCheck)
 	// ChatroomListen GET request
 	router.GET(constant.ChatroomListen, chatroom.WsHandler())
 	// PubSub publish / subscribe APIs
