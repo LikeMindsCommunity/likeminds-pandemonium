@@ -56,10 +56,14 @@ func publishOnChatroomTopic(c *gin.Context, topic string) {
 		return
 	}
 	conversationResponse.DeviceID = deviceID
+	conversationResponseString, err := json.Marshal(conversationResponse)
+	if err != nil {
+		return
+	}
 
 	redisClient := GetRedisClientFromContext(c)
 	// publish rawData to pubsub channel:<chatroomID>
-	if err := redisClient.Publish(ctx, topic, conversationResponse).Err(); err != nil {
+	if err := redisClient.Publish(ctx, topic, conversationResponseString).Err(); err != nil {
 		api.GeneralAPIError(c, err.Error())
 		log.Println("Publish error:", err)
 		return
