@@ -2,12 +2,15 @@ package pubsub
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/common/models"
 	"log"
+	"strings"
 )
 
 var ctx = context.Background()
@@ -27,19 +30,38 @@ func Publish(c *gin.Context) {
 func PubSub(c *gin.Context, method int) {
 	switch method {
 	case constant.POSTMethod:
-		topic := c.Param("topic")
+		topic := c.Param(ParamTopic)
 		if topic == "" || topic == "null" {
 			api.GeneralBadRequestError(c, "topic is required")
 			return
 		}
-		rawData, _ := c.GetRawData()
-		redisClient := GetRedisClientFromContext(c)
-		// publish rawData to pubsub channel:<chatroomID>
-		if err := redisClient.Publish(ctx, topic, rawData).Err(); err != nil {
-			api.GeneralAPIError(c, err.Error())
-			log.Println("Publish error:", err)
+		topicSplit := strings.Split(topic, ":")
+		if len(topicSplit) < 1 {
+			api.GeneralBadRequestError(c, "invalid topic")
 			return
 		}
+		if topicSplit[0] == TopicChatroomType {
+			publishOnChatroomTopic(c, topic)
+		}
 		api.GenerateResponse(c, nil)
+	}
+}
+
+func publishOnChatroomTopic(c *gin.Context, topic string) {
+	deviceID := c.GetHeader(constant.HeadersDeviceId)
+	rawData, _ := c.GetRawData()
+
+	var conversationResponse models.ConversationResponse
+	if err := json.Unmarshal(rawData, &conversationResponse); err != nil {
+		return
+	}
+	conversationResponse.DeviceID = deviceID
+
+	redisClient := GetRedisClientFromContext(c)
+	// publish rawData to pubsub channel:<chatroomID>
+	if err := redisClient.Publish(ctx, topic, conversationResponse).Err(); err != nil {
+		api.GeneralAPIError(c, err.Error())
+		log.Println("Publish error:", err)
+		return
 	}
 }
