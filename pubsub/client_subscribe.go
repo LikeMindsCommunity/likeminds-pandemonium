@@ -195,7 +195,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 					return
 				}
 				if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
-					(client.DeviceID != "null" && client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
+					(client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
 					continue
 				}
 				// Create NextWriter of type websocket.TextMessage
