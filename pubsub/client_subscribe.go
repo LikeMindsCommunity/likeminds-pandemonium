@@ -70,7 +70,29 @@ func Subscribe() gin.HandlerFunc {
 			}
 			redisClient := GetRedisClientFromContext(c)
 			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
+		case TopicTypeCommunity:
+			UUID := c.GetHeader(constant.HeadersMemberId)
+			deviceID := c.GetHeader(constant.HeadersDeviceId)
+			var communityID string
+			if len(topicSplit) > 1 {
+				communityID = topicSplit[1]
+			}
+			if communityID == "" || communityID == "null" || UUID == "" || UUID == "null" {
+				return
+			}
+
+			var wsServer *ws.WsServer
+			if _, ok := chatroomWsServer.wsServers[topic]; ok {
+				wsServer = chatroomWsServer.wsServers[topic]
+			} else {
+				wsServer = ws.NewWebsocketServer()
+				go wsServer.Run()
+				chatroomWsServer.wsServers[topic] = wsServer
+			}
+			redisClient := GetRedisClientFromContext(c)
+			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
 		}
+
 	}
 }
 

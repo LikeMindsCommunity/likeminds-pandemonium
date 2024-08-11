@@ -6,13 +6,8 @@ const (
 
 const (
 	TopicTypeChatroom            = "chatroom"
-	TopicNameChatroom            = TopicTypeChatroom + ":%s"
+	TopicTypeCommunity           = "community"
 	TopicMessageTypeConversation = "conversation"
-)
-
-const (
-	TopicCommunityType = "community"
-	TopicCommunity     = TopicCommunityType + ":%s"
 )
 
 const (

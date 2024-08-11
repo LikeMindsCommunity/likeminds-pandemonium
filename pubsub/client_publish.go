@@ -28,7 +28,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 		}
 
 		switch topicSplit[0] {
-		case TopicTypeChatroom:
+		case TopicTypeChatroom, TopicTypeCommunity:
 			switch topicMessageType {
 			case TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
