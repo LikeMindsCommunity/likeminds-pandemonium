@@ -5,10 +5,17 @@ const (
 )
 
 const (
-	TopicChatroomType = "chatroom"
-	TopicChatroom     = TopicChatroomType + ":%s"
+	TopicTypeChatroom            = "chatroom"
+	TopicNameChatroom            = TopicTypeChatroom + ":%s"
+	TopicMessageTypeConversation = "conversation"
 )
 
 const (
-	ParamTopic = "topic"
+	TopicCommunityType = "community"
+	TopicCommunity     = TopicCommunityType + ":%s"
+)
+
+const (
+	ParamTopic            = "topic"
+	ParamTopicMessageType = "topic_message_type"
 )

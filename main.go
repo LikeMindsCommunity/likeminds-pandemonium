@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/chatroom"
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/pubsub"
 	"log"
@@ -19,8 +18,8 @@ func main() {
 
 	router.Use(pubsub.ApiMiddleware(redisClient))
 	// ChatroomListen GET request
-	router.GET(constant.ChatroomListen, chatroom.WsHandler())
-	// PubSub publish / subscribe APIs
+	router.GET(constant.RedisSubscribe, pubsub.Subscribe())
+	// PublishWithMethod publish / subscribe APIs
 	router.POST(constant.RedisPublish, pubsub.Publish)
 
 	// start server

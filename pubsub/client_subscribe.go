@@ -1,15 +1,13 @@
-package chatroom
+package pubsub
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
+	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common/models"
-	"likeminds-pandemonium/pubsub"
 	"likeminds-pandemonium/ws"
 	"log"
 	"net/http"
@@ -21,7 +19,6 @@ type WsServer struct {
 }
 
 var (
-	ctx              = context.Background()
 	chatroomWsServer = newChatroomWsServer()
 	upgrader         = newUpgrader()
 )
@@ -41,27 +38,39 @@ func newUpgrader() websocket.Upgrader {
 	}
 }
 
-// WsHandler returns custom Chatroom gin.HandlerFunc. Create/Get WsServer w.r.t chatroom_id
-func WsHandler() gin.HandlerFunc {
+// Subscribe to a specific topic
+func Subscribe() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		chatroomID := c.Query("chatroom_id")
-		UUID := c.GetHeader(constant.HeadersMemberId)
-		deviceID := c.GetHeader(constant.HeadersDeviceId)
-		if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" {
+		topic := c.Param(ParamTopic)
+		topicSplit, err := GetTopicSplit(topic)
+		if err != nil {
+			api.GeneralBadRequestError(c, err.Error())
 			return
 		}
-		topic := fmt.Sprintf(pubsub.TopicChatroom, chatroomID)
 
-		var wsServer *ws.WsServer
-		if _, ok := chatroomWsServer.wsServers[topic]; ok {
-			wsServer = chatroomWsServer.wsServers[topic]
-		} else {
-			wsServer = ws.NewWebsocketServer()
-			go wsServer.Run()
-			chatroomWsServer.wsServers[topic] = wsServer
+		switch topicSplit[0] {
+		case TopicTypeChatroom:
+			UUID := c.GetHeader(constant.HeadersMemberId)
+			deviceID := c.GetHeader(constant.HeadersDeviceId)
+			var chatroomID string
+			if len(topicSplit) > 1 {
+				chatroomID = topicSplit[1]
+			}
+			if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" {
+				return
+			}
+
+			var wsServer *ws.WsServer
+			if _, ok := chatroomWsServer.wsServers[topic]; ok {
+				wsServer = chatroomWsServer.wsServers[topic]
+			} else {
+				wsServer = ws.NewWebsocketServer()
+				go wsServer.Run()
+				chatroomWsServer.wsServers[topic] = wsServer
+			}
+			redisClient := GetRedisClientFromContext(c)
+			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
 		}
-		redisClient := pubsub.GetRedisClientFromContext(c)
-		ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
 	}
 }
 
@@ -73,17 +82,17 @@ func ServeWs(topic string, UUID string, deviceID string, wsServer *ws.WsServer, 
 		return
 	}
 
-	client := ws.NewClient(conn, wsServer, UUID, deviceID)
+	client := ws.NewClient(conn, wsServer, UUID, deviceID, topic)
 
-	go writePump(topic, client, redisClient)
-	go readPump(topic, client, redisClient)
+	go writePump(client, redisClient)
+	go readPump(client, redisClient)
 
 	wsServer.Register <- client
 }
 
 // disconnect closes connection and clears client
-func disconnect(topic string, client *ws.Client) {
-	unregisterFromServer(topic, client)
+func disconnect(client *ws.Client) {
+	unregisterFromServer(client)
 	err := client.Conn.Close()
 	if err != nil {
 		return
@@ -91,18 +100,18 @@ func disconnect(topic string, client *ws.Client) {
 }
 
 // unregisterFromServer to remove client from WsServer and delete WsServer from ChatroomWsServer if last client left
-func unregisterFromServer(topic string, client *ws.Client) {
+func unregisterFromServer(client *ws.Client) {
 	client.WsServer.Unregister <- client
 	if client.WsServer.GetClientsCount() <= 1 {
-		delete(chatroomWsServer.wsServers, topic)
+		delete(chatroomWsServer.wsServers, client.Topic)
 	}
 }
 
 // readPump to read incoming message from client
-func readPump(topic string, client *ws.Client, redisClient *redis.Client) {
+func readPump(client *ws.Client, redisClient *redis.Client) {
 	defer func() {
 		// disconnect client after exit from for loop
-		disconnect(topic, client)
+		disconnect(client)
 	}()
 
 	//client.conn.SetReadLimit(maxMessageSize)
@@ -130,8 +139,8 @@ func readPump(topic string, client *ws.Client, redisClient *redis.Client) {
 			}
 			break
 		}
-		// publish jsonMessage to pubsub TopicChatroom
-		if err := redisClient.Publish(ctx, topic, jsonMessage).Err(); err != nil {
+		// publish jsonMessage to pubsub TopicNameChatroom
+		if err := redisClient.Publish(ctx, client.Topic, jsonMessage).Err(); err != nil {
 			log.Println("Publish error:", err)
 			return
 		}
@@ -139,9 +148,9 @@ func readPump(topic string, client *ws.Client, redisClient *redis.Client) {
 }
 
 // writePump to send message from server to client
-func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
-	// subscribe to pubsub TopicChatroom
-	sub := redisClient.Subscribe(ctx, topic)
+func writePump(client *ws.Client, redisClient *redis.Client) {
+	// subscribe to pubsub TopicNameChatroom
+	sub := redisClient.Subscribe(ctx, client.Topic)
 	// start ticker at regular interval of PingPeriod
 	ticker := time.NewTicker(ws.PingPeriod)
 	defer func() {
@@ -152,7 +161,7 @@ func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
 		if err != nil {
 			return
 		}
-		// stop listening to pubsub TopicChatroom
+		// stop listening to pubsub TopicNameChatroom
 		err = sub.Close()
 		if err != nil {
 			return
@@ -175,25 +184,32 @@ func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
 				return
 			}
 			messagePayloadByte := []byte(message.Payload)
-			var conversationResponse models.ConversationResponse
-			if err := json.Unmarshal(messagePayloadByte, &conversationResponse); err != nil {
+			var response Response
+			if err := json.Unmarshal(messagePayloadByte, &response); err != nil {
 				return
 			}
-			if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
-				(client.DeviceID != "null" && client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
-				continue
-			}
-			// Create NextWriter of type websocket.TextMessage
-			w, err := client.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			_, err = w.Write(messagePayloadByte)
-			if err != nil {
-				return
-			}
-			if err := w.Close(); err != nil {
-				return
+			switch response.TopicMessageType {
+			case TopicMessageTypeConversation:
+				var conversationResponse models.ConversationResponse
+				if err := json.Unmarshal(response.RawData, &conversationResponse); err != nil {
+					return
+				}
+				if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
+					(client.DeviceID != "null" && client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
+					continue
+				}
+				// Create NextWriter of type websocket.TextMessage
+				w, err := client.Conn.NextWriter(websocket.TextMessage)
+				if err != nil {
+					return
+				}
+				_, err = w.Write(messagePayloadByte)
+				if err != nil {
+					return
+				}
+				if err := w.Close(); err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			// At regular interval of PingPeriod, update SetWriteDeadline to time.Now() + WriteWait

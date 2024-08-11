@@ -5,10 +5,6 @@ const (
 )
 
 const (
-	ChatroomListen = "/chatroom/listen"
-)
-
-const (
 	RedisPublish   = "/publish/:topic"
 	RedisSubscribe = "/subscribe/:topic"
 )
