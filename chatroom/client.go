@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api/constant"
+	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/pubsub"
 	"likeminds-pandemonium/ws"
 	"log"
@@ -17,22 +18,6 @@ import (
 
 type WsServer struct {
 	wsServers map[string]*ws.WsServer
-}
-
-type ConversationResponse struct {
-	Conversation Conversation `json:"conversation"`
-}
-
-type Conversation struct {
-	Member Member `json:"member"`
-}
-
-type Member struct {
-	SDKClientInfo SDKClientInfo `json:"sdk_client_info"`
-}
-
-type SDKClientInfo struct {
-	UUID string `json:"uuid"`
 }
 
 var (
@@ -62,7 +47,7 @@ func WsHandler() gin.HandlerFunc {
 		chatroomID := c.Query("chatroom_id")
 		UUID := c.GetHeader(constant.HeadersMemberId)
 		deviceID := c.GetHeader(constant.HeadersDeviceId)
-		if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" || deviceID == "" || deviceID == "null" {
+		if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" {
 			return
 		}
 		topic := fmt.Sprintf(pubsub.TopicChatroom, chatroomID)
@@ -190,11 +175,12 @@ func writePump(topic string, client *ws.Client, redisClient *redis.Client) {
 				return
 			}
 			messagePayloadByte := []byte(message.Payload)
-			var conversationResponse ConversationResponse
+			var conversationResponse models.ConversationResponse
 			if err := json.Unmarshal(messagePayloadByte, &conversationResponse); err != nil {
 				return
 			}
-			if conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID {
+			if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
+				(client.DeviceID != "null" && client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
 				continue
 			}
 			// Create NextWriter of type websocket.TextMessage

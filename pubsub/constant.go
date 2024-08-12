@@ -5,5 +5,10 @@ const (
 )
 
 const (
-	TopicChatroom = "chatroom:%s"
+	TopicChatroomType = "chatroom"
+	TopicChatroom     = TopicChatroomType + ":%s"
+)
+
+const (
+	ParamTopic = "topic"
 )
