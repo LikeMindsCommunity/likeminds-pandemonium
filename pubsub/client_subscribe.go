@@ -56,20 +56,12 @@ func Subscribe() gin.HandlerFunc {
 			if len(topicSplit) > 1 {
 				chatroomID = topicSplit[1]
 			}
+			//Close connection if chatroom_id is invalid when subscribed to TopicTypeChatroom
 			if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" {
 				return
 			}
 
-			var wsServer *ws.WsServer
-			if _, ok := chatroomWsServer.wsServers[topic]; ok {
-				wsServer = chatroomWsServer.wsServers[topic]
-			} else {
-				wsServer = ws.NewWebsocketServer()
-				go wsServer.Run()
-				chatroomWsServer.wsServers[topic] = wsServer
-			}
-			redisClient := GetRedisClientFromContext(c)
-			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
+			ServeWs(topic, UUID, deviceID, createOrGetWsServer(topic), c.Writer, c.Request, GetRedisClientFromContext(c))
 		case TopicTypeCommunity:
 			UUID := c.GetHeader(constant.HeadersMemberId)
 			deviceID := c.GetHeader(constant.HeadersDeviceId)
@@ -77,23 +69,27 @@ func Subscribe() gin.HandlerFunc {
 			if len(topicSplit) > 1 {
 				communityID = topicSplit[1]
 			}
+			//Close connection if community_id is invalid when subscribed to TopicTypeCommunity
 			if communityID == "" || communityID == "null" || UUID == "" || UUID == "null" {
 				return
 			}
 
-			var wsServer *ws.WsServer
-			if _, ok := chatroomWsServer.wsServers[topic]; ok {
-				wsServer = chatroomWsServer.wsServers[topic]
-			} else {
-				wsServer = ws.NewWebsocketServer()
-				go wsServer.Run()
-				chatroomWsServer.wsServers[topic] = wsServer
-			}
-			redisClient := GetRedisClientFromContext(c)
-			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
+			ServeWs(topic, UUID, deviceID, createOrGetWsServer(topic), c.Writer, c.Request, GetRedisClientFromContext(c))
 		}
 
 	}
+}
+
+// createOrGetWsServer to create new WsServer get against `topic`
+func createOrGetWsServer(topic string) *ws.WsServer {
+	var wsServer *ws.WsServer
+	if _, ok := chatroomWsServer.wsServers[topic]; ok {
+		wsServer = chatroomWsServer.wsServers[topic]
+	} else {
+		wsServer = ws.NewWebsocketServer()
+		go wsServer.Run()
+	}
+	return wsServer
 }
 
 // ServeWs handles websocket requests of a chatroom from clients requests.
@@ -205,6 +201,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 				}
 				return
 			}
+			// Unmarshal messagePayloadByte Response
 			messagePayloadByte := []byte(message.Payload)
 			var response Response
 			if err := json.Unmarshal(messagePayloadByte, &response); err != nil {
@@ -216,6 +213,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 				if err := json.Unmarshal(response.RawData, &conversationResponse); err != nil {
 					return
 				}
+				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
 				if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
 					(client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
 					continue

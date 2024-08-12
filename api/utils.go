@@ -31,6 +31,7 @@ func GenerateResponse(c *gin.Context, dataResponse map[string]interface{}) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GeneralAPIError to generate StatusInternalServerError
 func GeneralAPIError(c *gin.Context, errorMessage string) {
 	c.JSON(http.StatusInternalServerError, Response{
 		Success:      false,

@@ -17,6 +17,7 @@ type Response struct {
 	RawData          []byte `json:"raw_data"`
 }
 
+// NewResponse to create Response from deviceID (device ID of user), topicMessageType (message type publish to connection), rawData (raw data publish to the connection)
 func NewResponse(deviceID string, topicMessageType string, rawData []byte) *Response {
 	return &Response{DeviceID: deviceID, TopicMessageType: topicMessageType, RawData: rawData}
 }
