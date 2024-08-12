@@ -17,7 +17,7 @@ pipeline {
         
         stage ('Build Image') {
             steps {
-                sh "sudo docker build -f Dockerfile.pandemonium-beta -t 081371230266.dkr.ecr.ap-south-1.amazonaws.com/likeminds-pandemonium-repo:pandemonium-V$BUILD_NUMBER ."
+                sh "sudo docker build -f Dockerfile.pandemonium -t 081371230266.dkr.ecr.ap-south-1.amazonaws.com/likeminds-pandemonium-repo:pandemonium-V$BUILD_NUMBER ."
             }
         }
         
