@@ -10,6 +10,6 @@ import (
 func Home(c *gin.Context) {
 	//Send response with success as true
 	c.JSON(http.StatusOK, gin.H{
-		"Success": true,
+		"success": true,
 	})
 }
