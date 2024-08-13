@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/pubsub"
+	"likeminds-pandemonium/web"
 	"log"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -15,9 +17,9 @@ var (
 func main() {
 	initGin()
 	redisClient := pubsub.InitRedisClient()
-
 	router.Use(pubsub.ApiMiddleware(redisClient))
-	// Subscribe
+	
+	router.GET("", web.Home)
 	router.GET(constant.RedisSubscribe, pubsub.Subscribe())
 	// Publish
 	router.POST(constant.RedisPublish, pubsub.Publish)

@@ -15,7 +15,7 @@ services:
     container_name: pandemonium
     hostname: pandemonium
     build:
-      dockerfile: ./Dockerfile.pandemonium-local
+      dockerfile: ./Dockerfile.pandemonium
     ports:
       - 8081:8081
     restart: always
