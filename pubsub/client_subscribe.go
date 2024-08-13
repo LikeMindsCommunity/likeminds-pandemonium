@@ -33,8 +33,8 @@ func newChatroomWsServer() *WsServer {
 // newUpgrader creates a new websocket Upgrader
 func newUpgrader() websocket.Upgrader {
 	return websocket.Upgrader{
-		ReadBufferSize:  4096,
-		WriteBufferSize: 4096,
+		ReadBufferSize:  ReadBufferSizeDefault,
+		WriteBufferSize: WriteBufferSizeDefault,
 	}
 }
 
