@@ -16,9 +16,9 @@ func PublishWithMethod(c *gin.Context, method int) {
 	switch method {
 	case constant.POSTMethod:
 		topic := c.Param(ParamTopic)
-		topicMessageType := c.Param(ParamTopicMessageType)
+		topicMessageType := c.Query(ParamTopicMessageType)
 		if topicMessageType == "" || topicMessageType == "null" {
-			api.GeneralBadRequestError(c, "topic message type is required")
+			api.GeneralBadRequestError(c, "topic_message_type is required")
 			return
 		}
 		topicSplit, err := GetTopicSplit(topic)
@@ -42,14 +42,14 @@ func PublishWithMethod(c *gin.Context, method int) {
 func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) {
 	deviceID := c.GetHeader(constant.HeadersDeviceId)
 	rawData, _ := c.GetRawData()
-	responseString, err := json.Marshal(NewResponse(deviceID, topicMessageType, rawData))
+	responseBytes, err := json.Marshal(NewResponse(deviceID, topicMessageType, string(rawData)))
 	if err != nil {
 		return
 	}
 
 	redisClient := GetRedisClientFromContext(c)
 	// publish rawData to pubsub channel:<chatroomID>
-	if err := redisClient.Publish(ctx, topic, responseString).Err(); err != nil {
+	if err := redisClient.Publish(ctx, topic, responseBytes).Err(); err != nil {
 		api.GeneralAPIError(c, err.Error())
 		log.Println("Publish error:", err)
 		return

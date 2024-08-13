@@ -14,11 +14,11 @@ var ctx = context.Background()
 type Response struct {
 	DeviceID         string `json:"device_id"`
 	TopicMessageType string `json:"topic_message_type"`
-	RawData          []byte `json:"raw_data"`
+	RawData          string `json:"raw_data"`
 }
 
 // NewResponse to create Response from deviceID (device ID of user), topicMessageType (message type publish to connection), rawData (raw data publish to the connection)
-func NewResponse(deviceID string, topicMessageType string, rawData []byte) *Response {
+func NewResponse(deviceID string, topicMessageType string, rawData string) *Response {
 	return &Response{DeviceID: deviceID, TopicMessageType: topicMessageType, RawData: rawData}
 }
 

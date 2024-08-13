@@ -17,9 +17,9 @@ func main() {
 	redisClient := pubsub.InitRedisClient()
 
 	router.Use(pubsub.ApiMiddleware(redisClient))
-	// ChatroomListen GET request
+	// Subscribe
 	router.GET(constant.RedisSubscribe, pubsub.Subscribe())
-	// PublishWithMethod publish / subscribe APIs
+	// Publish
 	router.POST(constant.RedisPublish, pubsub.Publish)
 
 	// start server

@@ -210,12 +210,12 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			switch response.TopicMessageType {
 			case TopicMessageTypeConversation:
 				var conversationResponse models.ConversationResponse
-				if err := json.Unmarshal(response.RawData, &conversationResponse); err != nil {
+				if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
 					return
 				}
 				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
 				if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
-					(client.DeviceID != "" && client.DeviceID == conversationResponse.DeviceID) {
+					(client.DeviceID != "" && client.DeviceID == response.DeviceID) {
 					continue
 				}
 				// Create NextWriter of type websocket.TextMessage
