@@ -18,7 +18,7 @@ func main() {
 	initGin()
 	redisClient := pubsub.InitRedisClient()
 	router.Use(pubsub.ApiMiddleware(redisClient))
-	
+
 	router.GET("", web.Home)
 	router.GET(constant.RedisSubscribe, pubsub.Subscribe())
 	// Publish

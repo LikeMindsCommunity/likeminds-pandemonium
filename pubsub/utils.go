@@ -43,11 +43,11 @@ func GetRedisClientFromContext(c *gin.Context) *redis.Client {
 // GetTopicSplit will decode topic and return split
 func GetTopicSplit(topic string) ([]string, error) {
 	if topic == "" || topic == "null" {
-		return nil, errors.New("topic is required")
+		return nil, errors.New(ErrorTopicMissing)
 	}
 	topicSplit := strings.Split(topic, ":")
 	if len(topicSplit) < 1 {
-		return nil, errors.New("invalid topic")
+		return nil, errors.New(ErrorTopicInvalid)
 	}
 	return topicSplit, nil
 }

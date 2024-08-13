@@ -18,7 +18,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 		topic := c.Param(ParamTopic)
 		topicMessageType := c.Query(ParamTopicMessageType)
 		if topicMessageType == "" || topicMessageType == "null" {
-			api.GeneralBadRequestError(c, "topic_message_type is required")
+			api.GeneralBadRequestError(c, ErrorTopicMessageTypeMissing)
 			return
 		}
 		topicSplit, err := GetTopicSplit(topic)
@@ -51,7 +51,7 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	// publish rawData to pubsub channel:<chatroomID>
 	if err := redisClient.Publish(ctx, topic, responseBytes).Err(); err != nil {
 		api.GeneralAPIError(c, err.Error())
-		log.Println("Publish error:", err)
+		log.Println(ErrorPublish, err)
 		return
 	}
 }
