@@ -1,0 +1,29 @@
+services:
+  pubsub:
+    image: redis
+    container_name: pubsub
+    hostname: pubsub
+    ports:
+      - 6380:6380
+    volumes:
+      - ./pubsub/redis.conf:/usr/local/etc/redis/redis.conf
+    restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - local_pandemonium
+  pandemonium:
+    container_name: pandemonium
+    hostname: pandemonium
+    build:
+      dockerfile: ./Dockerfile.pandemonium
+    ports:
+      - 8081:8081
+    restart: always
+    networks:
+      # Name of the network created
+      - local_pandemonium
+networks:
+  local_pandemonium:
+    # <package_name>_<network_name>
+    name: likeminds-authentication_local_auth
+    external: true
