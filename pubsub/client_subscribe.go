@@ -56,8 +56,14 @@ func Subscribe() gin.HandlerFunc {
 			if len(topicSplit) > 1 {
 				chatroomID = topicSplit[1]
 			}
-			//Close connection if chatroom_id is invalid when subscribed to TopicTypeChatroom
-			if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" {
+			//Close connection if x-member-id is invalid when subscribed to TopicTypeChatroom
+			if UUID == "" || UUID == "null" {
+				api.GeneralBadRequestError(c, "user id is required")
+				return
+			}
+			//Close connection if chatroom:<chatroom_id> is invalid when subscribed to TopicTypeChatroom
+			if chatroomID == "" || chatroomID == "null" {
+				api.GeneralBadRequestError(c, "chatroom id is required")
 				return
 			}
 
@@ -69,8 +75,14 @@ func Subscribe() gin.HandlerFunc {
 			if len(topicSplit) > 1 {
 				communityID = topicSplit[1]
 			}
-			//Close connection if community_id is invalid when subscribed to TopicTypeCommunity
-			if communityID == "" || communityID == "null" || UUID == "" || UUID == "null" {
+			//Close connection if x-member-id is invalid when subscribed to TopicTypeChatroom
+			if UUID == "" || UUID == "null" {
+				api.GeneralBadRequestError(c, "user id is required")
+				return
+			}
+			//Close connection if community:<community_id> is invalid when subscribed to TopicTypeCommunity
+			if communityID == "" || communityID == "null" {
+				api.GeneralBadRequestError(c, "community id is required")
 				return
 			}
 
