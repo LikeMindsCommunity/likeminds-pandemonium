@@ -14,18 +14,18 @@ import (
 	"time"
 )
 
-type WsServer struct {
+type SubscribeWsServer struct {
 	wsServers map[string]*ws.WsServer
 }
 
 var (
-	chatroomWsServer = newChatroomWsServer()
-	upgrader         = newUpgrader()
+	subscribeWsServer = newSubscribeWsServer()
+	upgrader          = newUpgrader()
 )
 
-// newChatroomWsServer creates a new Chatroom WsServer type
-func newChatroomWsServer() *WsServer {
-	return &WsServer{
+// newSubscribeWsServer creates a new Chatroom SubscribeWsServer type
+func newSubscribeWsServer() *SubscribeWsServer {
+	return &SubscribeWsServer{
 		wsServers: make(map[string]*ws.WsServer),
 	}
 }
@@ -80,11 +80,11 @@ func Subscribe() gin.HandlerFunc {
 	}
 }
 
-// createOrGetWsServer to create new WsServer get against `topic`
+// createOrGetWsServer to create new SubscribeWsServer get against `topic`
 func createOrGetWsServer(topic string) *ws.WsServer {
 	var wsServer *ws.WsServer
-	if _, ok := chatroomWsServer.wsServers[topic]; ok {
-		wsServer = chatroomWsServer.wsServers[topic]
+	if _, ok := subscribeWsServer.wsServers[topic]; ok {
+		wsServer = subscribeWsServer.wsServers[topic]
 	} else {
 		wsServer = ws.NewWebsocketServer()
 		go wsServer.Run()
@@ -117,11 +117,11 @@ func disconnect(client *ws.Client) {
 	}
 }
 
-// unregisterFromServer to remove client from WsServer and delete WsServer from ChatroomWsServer if last client left
+// unregisterFromServer to remove client from SubscribeWsServer and delete SubscribeWsServer from ChatroomWsServer if last client left
 func unregisterFromServer(client *ws.Client) {
 	client.WsServer.Unregister <- client
 	if client.WsServer.GetClientsCount() <= 1 {
-		delete(chatroomWsServer.wsServers, client.Topic)
+		delete(subscribeWsServer.wsServers, client.Topic)
 	}
 }
 
@@ -194,7 +194,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 				return
 			}
 			if !ok {
-				// The WsServer closed the channel.
+				// The SubscribeWsServer closed the channel.
 				err := client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				if err != nil {
 					return

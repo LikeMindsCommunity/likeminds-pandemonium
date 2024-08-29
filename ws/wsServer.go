@@ -21,7 +21,6 @@ type WsServer struct {
 	clients    map[*Client]bool
 	Register   chan *Client
 	Unregister chan *Client
-	Broadcast  chan []byte
 }
 
 // NewClient creates new client which will be added to WsServer
@@ -41,7 +40,6 @@ func NewWebsocketServer() *WsServer {
 		clients:    make(map[*Client]bool),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
-		Broadcast:  make(chan []byte),
 	}
 }
 
