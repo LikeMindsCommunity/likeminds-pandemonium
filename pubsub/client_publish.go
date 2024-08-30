@@ -32,10 +32,8 @@ func PublishWithMethod(c *gin.Context, method int) {
 			switch topicMessageType {
 			case TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
-
 			}
 		}
-		api.GenerateResponse(c, nil)
 	}
 }
 
@@ -54,4 +52,5 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 		log.Println(ErrorPublishRedis, err)
 		return
 	}
+	api.GenerateResponse(c, nil)
 }

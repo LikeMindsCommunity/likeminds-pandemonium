@@ -171,7 +171,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Println(ErrorUnexpectedCloseWs, err)
 			}
-			break
+			return
 		}
 		// publish jsonMessage to pubsub TopicNameChatroom
 		if err := redisClient.Publish(ctx, client.Topic, jsonMessage).Err(); err != nil {
@@ -232,6 +232,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			case TopicMessageTypeConversation:
 				var conversationResponse models.ConversationResponse
 				if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
+					log.Println(ErrorUnmarshalErrorJson, err)
 					return
 				}
 				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
@@ -241,8 +242,8 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 				}
 				// Create NextWriter of type websocket.TextMessage
 				w, err := client.Conn.NextWriter(websocket.TextMessage)
-				log.Println(ErrorWriterOpenWs, err)
 				if err != nil {
+					log.Println(ErrorWriterOpenWs, err)
 					return
 				}
 				_, err = w.Write(messagePayloadByte)
