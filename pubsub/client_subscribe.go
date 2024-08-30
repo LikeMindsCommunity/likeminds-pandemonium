@@ -236,7 +236,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 					return
 				}
 				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
-				if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
+				if (conversationResponse.Conversation.Member.UUID == client.UUID) &&
 					(client.DeviceID != "" && client.DeviceID == response.DeviceID) {
 					continue
 				}
