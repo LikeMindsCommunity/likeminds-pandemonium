@@ -15,7 +15,7 @@ func GoDotEnvVariable(key string) string {
 		log.Fatal(err)
 	}
 	// Uncomment this to make it work with IDE debug mode (tested on GoLand)
-	//dir = "/Users/<user_name>/path_to_pandemonium_root_directory"
+	// dir = "/Users/<user_name>/path_to_authentication_root_directory"
 	environmentPath := filepath.Join(dir, ".env")
 	envs, err := godotenv.Read(environmentPath)
 
