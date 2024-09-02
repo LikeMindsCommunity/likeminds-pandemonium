@@ -14,18 +14,18 @@ import (
 	"time"
 )
 
-type WsServer struct {
+type SubscribeWsServer struct {
 	wsServers map[string]*ws.WsServer
 }
 
 var (
-	chatroomWsServer = newChatroomWsServer()
-	upgrader         = newUpgrader()
+	subscribeWsServer = newSubscribeWsServer()
+	upgrader          = newUpgrader()
 )
 
-// newChatroomWsServer creates a new Chatroom WsServer type
-func newChatroomWsServer() *WsServer {
-	return &WsServer{
+// newSubscribeWsServer creates a new Chatroom SubscribeWsServer type
+func newSubscribeWsServer() *SubscribeWsServer {
+	return &SubscribeWsServer{
 		wsServers: make(map[string]*ws.WsServer),
 	}
 }
@@ -56,8 +56,14 @@ func Subscribe() gin.HandlerFunc {
 			if len(topicSplit) > 1 {
 				chatroomID = topicSplit[1]
 			}
-			//Close connection if chatroom_id is invalid when subscribed to TopicTypeChatroom
-			if chatroomID == "" || chatroomID == "null" || UUID == "" || UUID == "null" {
+			//Close connection if UUID sent in headers is invalid when subscribed to TopicTypeChatroom
+			if UUID == "" || UUID == "null" {
+				api.GeneralBadRequestError(c, ErrorUserUUIDMissing)
+				return
+			}
+			//Close connection if chatroom ID sent in request is invalid when subscribed to TopicTypeChatroom
+			if chatroomID == "" || chatroomID == "null" {
+				api.GeneralBadRequestError(c, ErrorChatroomIDMissing)
 				return
 			}
 
@@ -69,22 +75,29 @@ func Subscribe() gin.HandlerFunc {
 			if len(topicSplit) > 1 {
 				communityID = topicSplit[1]
 			}
-			//Close connection if community_id is invalid when subscribed to TopicTypeCommunity
-			if communityID == "" || communityID == "null" || UUID == "" || UUID == "null" {
+			//Close connection if UUID sent in headers is invalid when subscribed to TopicTypeChatroom
+			if UUID == "" || UUID == "null" {
+				api.GeneralBadRequestError(c, ErrorUserUUIDMissing)
 				return
 			}
-
-			ServeWs(topic, UUID, deviceID, createOrGetWsServer(topic), c.Writer, c.Request, GetRedisClientFromContext(c))
+			//Close connection if community ID sent in request is invalid when subscribed to TopicTypeChatroom
+			if communityID == "" || communityID == "null" {
+				api.GeneralBadRequestError(c, ErrorCommunityIDMissing)
+				return
+			}
+			wsServer := createOrGetWsServer(topic)
+			redisClient := GetRedisClientFromContext(c)
+			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
 		}
 
 	}
 }
 
-// createOrGetWsServer to create new WsServer get against `topic`
+// createOrGetWsServer to create new SubscribeWsServer get against `topic`
 func createOrGetWsServer(topic string) *ws.WsServer {
 	var wsServer *ws.WsServer
-	if _, ok := chatroomWsServer.wsServers[topic]; ok {
-		wsServer = chatroomWsServer.wsServers[topic]
+	if _, ok := subscribeWsServer.wsServers[topic]; ok {
+		wsServer = subscribeWsServer.wsServers[topic]
 	} else {
 		wsServer = ws.NewWebsocketServer()
 		go wsServer.Run()
@@ -113,15 +126,16 @@ func disconnect(client *ws.Client) {
 	unregisterFromServer(client)
 	err := client.Conn.Close()
 	if err != nil {
+		log.Println(ErrorUnableToCloseWs, err)
 		return
 	}
 }
 
-// unregisterFromServer to remove client from WsServer and delete WsServer from ChatroomWsServer if last client left
+// unregisterFromServer to remove client from SubscribeWsServer and delete SubscribeWsServer from ChatroomWsServer if last client left
 func unregisterFromServer(client *ws.Client) {
 	client.WsServer.Unregister <- client
 	if client.WsServer.GetClientsCount() <= 1 {
-		delete(chatroomWsServer.wsServers, client.Topic)
+		delete(subscribeWsServer.wsServers, client.Topic)
 	}
 }
 
@@ -136,6 +150,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
 	err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 	if err != nil {
+		log.Println(ErrorReadDeadlineWs, err)
 		return
 	}
 	// set SetPongHandler to read incoming "ping" message through ticker. Used to increase SetReadDeadline
@@ -143,6 +158,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 		// update SetReadDeadline to time.Now() + PongWait
 		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 		if err != nil {
+			log.Println(ErrorReadDeadlineWs, err)
 			return err
 		}
 		return nil
@@ -153,13 +169,13 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 		_, jsonMessage, err := client.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("unexpected close error: %v", err)
+				log.Println(ErrorUnexpectedCloseWs, err)
 			}
-			break
+			return
 		}
 		// publish jsonMessage to pubsub TopicNameChatroom
 		if err := redisClient.Publish(ctx, client.Topic, jsonMessage).Err(); err != nil {
-			log.Println("Publish error:", err)
+			log.Println(ErrorPublishRedis, err)
 			return
 		}
 	}
@@ -177,11 +193,13 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 		// close client connection only
 		err := client.Conn.Close()
 		if err != nil {
+			log.Println(ErrorUnableToCloseWs, err)
 			return
 		}
 		// stop listening to pubsub TopicNameChatroom
 		err = sub.Close()
 		if err != nil {
+			log.Println(ErrorUnableToCloseRedis, err)
 			return
 		}
 	}()
@@ -191,12 +209,14 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			// SetWriteDeadline to time.Now() + WriteWait
 			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
 			if err != nil {
+				log.Println(ErrorWriteDeadlineWs, err)
 				return
 			}
 			if !ok {
-				// The WsServer closed the channel.
+				// The SubscribeWsServer closed the channel.
 				err := client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				if err != nil {
+					log.Println(ErrorUnableToWriteWs, err)
 					return
 				}
 				return
@@ -205,29 +225,34 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			messagePayloadByte := []byte(message.Payload)
 			var response Response
 			if err := json.Unmarshal(messagePayloadByte, &response); err != nil {
+				log.Println(ErrorUnmarshalErrorJson, err)
 				return
 			}
 			switch response.TopicMessageType {
 			case TopicMessageTypeConversation:
 				var conversationResponse models.ConversationResponse
 				if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
+					log.Println(ErrorUnmarshalErrorJson, err)
 					return
 				}
 				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
-				if (conversationResponse.Conversation.Member.SDKClientInfo.UUID == client.UUID) &&
+				if (conversationResponse.Conversation.Member.UUID == client.UUID) &&
 					(client.DeviceID != "" && client.DeviceID == response.DeviceID) {
 					continue
 				}
 				// Create NextWriter of type websocket.TextMessage
 				w, err := client.Conn.NextWriter(websocket.TextMessage)
 				if err != nil {
+					log.Println(ErrorWriterOpenWs, err)
 					return
 				}
 				_, err = w.Write(messagePayloadByte)
 				if err != nil {
+					log.Println(ErrorUnableToWriteWs, err)
 					return
 				}
 				if err := w.Close(); err != nil {
+					log.Println(ErrorWriterCloseWs, err)
 					return
 				}
 			}
@@ -235,10 +260,12 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			// At regular interval of PingPeriod, update SetWriteDeadline to time.Now() + WriteWait
 			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
 			if err != nil {
+				log.Println(ErrorWriteDeadlineWs, err)
 				return
 			}
 			// Write message of type websocket.PingMessage
 			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Println(ErrorUnableToWriteWs, err)
 				return
 			}
 		}

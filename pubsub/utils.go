@@ -46,7 +46,7 @@ func GetTopicSplit(topic string) ([]string, error) {
 		return nil, errors.New(ErrorTopicMissing)
 	}
 	topicSplit := strings.Split(topic, ":")
-	if len(topicSplit) < 1 {
+	if len(topicSplit) <= 1 {
 		return nil, errors.New(ErrorTopicInvalid)
 	}
 	return topicSplit, nil

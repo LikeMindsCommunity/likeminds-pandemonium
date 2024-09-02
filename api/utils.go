@@ -39,18 +39,6 @@ func GeneralAPIError(c *gin.Context, errorMessage string) {
 	})
 }
 
-func GETQueryParamsMissingError(c *gin.Context) {
-	GeneralBadRequestError(c, ErrorQueryParamsMissing)
-	c.JSON(http.StatusBadRequest, Response{
-		Success:      false,
-		ErrorMessage: ErrorQueryParamsMissing,
-	})
-}
-
-func POSTBodyParamsMissingError(c *gin.Context) {
-	GeneralBadRequestError(c, ErrorBodyParamsMissing)
-}
-
 func GeneralBadRequestError(c *gin.Context, errorMessage string) {
 	c.JSON(http.StatusBadRequest, Response{
 		Success:      false,
