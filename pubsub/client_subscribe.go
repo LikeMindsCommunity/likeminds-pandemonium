@@ -156,7 +156,9 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 	// set SetPongHandler to read incoming "ping" message through ticker. Used to increase SetReadDeadline
 	client.Conn.SetPongHandler(func(string) error {
 		// update SetReadDeadline to time.Now() + PongWait
-		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
+		t := time.Now().Add(ws.PongWait)
+		log.Println("pong received at - ", t)
+		err := client.Conn.SetReadDeadline(t)
 		if err != nil {
 			log.Println(ErrorReadDeadlineWs, err)
 			return err
@@ -258,7 +260,9 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			}
 		case <-ticker.C:
 			// At regular interval of PingPeriod, update SetWriteDeadline to time.Now() + WriteWait
-			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
+			t := time.Now().Add(ws.WriteWait)
+			err := client.Conn.SetWriteDeadline(t)
+			log.Println("ticker set time to - ", t)
 			if err != nil {
 				log.Println(ErrorWriteDeadlineWs, err)
 				return
