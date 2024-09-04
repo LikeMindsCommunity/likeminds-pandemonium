@@ -173,6 +173,11 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 			log.Println(ErrorReadDeadlineWs, err)
 			return err
 		}
+		// Respond to the ping with a pong
+		if err := client.Conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+			log.Printf("Error sending pong response: %v", err)
+			return err
+		}
 		return nil
 	})
 
