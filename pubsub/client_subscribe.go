@@ -164,7 +164,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 		log.Println(ErrorReadDeadlineWs, err)
 		return
 	}
-	// set SetPongHandler to read incoming "ping" message through ticker. Used to increase SetReadDeadline
+	// set SetPongHandler to read incoming "ping" message. Used to increase SetReadDeadline
 	client.Conn.SetPingHandler(func(string) error {
 		log.Println(PingWs)
 		// update SetReadDeadline to time.Now() + PongWait
@@ -196,11 +196,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 func writePump(client *ws.Client, redisClient *redis.Client) {
 	// subscribe to pubsub TopicNameChatroom
 	sub := redisClient.Subscribe(ctx, client.Topic)
-	//// start ticker at regular interval of PingPeriod
-	//ticker := time.NewTicker(ws.PingPeriod)
 	defer func() {
-		//// stop ticker
-		//ticker.Stop()
 		// close client connection only
 		err := client.Conn.Close()
 		if err != nil {
@@ -268,20 +264,6 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 				}
 				log.Println(ReceivedMessageRedisWs)
 			}
-			/*case <-ticker.C:
-			// At regular interval of PingPeriod, update SetWriteDeadline to time.Now() + WriteWait
-			t := time.Now().Add(ws.WriteWait)
-			err := client.Conn.SetWriteDeadline(t)
-			log.Println("sent ping")
-			if err != nil {
-				log.Println(ErrorWriteDeadlineWs, err)
-				return
-			}
-			// Write message of type websocket.PingMessage
-			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Println(ErrorUnableToWriteWs, err)
-				return
-			}*/
 		}
 	}
 }
