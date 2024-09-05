@@ -134,6 +134,7 @@ func ServeWs(topic string, UUID string, deviceID string, wsServer *ws.WsServer, 
 
 // disconnect closes connection and clears client
 func disconnect(client *ws.Client) {
+	log.Println(ConnectionClosed)
 	unregisterFromServer(client)
 	err := client.Conn.Close()
 	if err != nil {
@@ -159,16 +160,10 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 
 	updateReadDeadline(client.Conn)
 
-	// set SetPongHandler to read incoming "pong" message. Used to increase SetReadDeadline
-	client.Conn.SetPongHandler(func(string) error {
-		log.Println(PongReceivedClient)
-		updateReadDeadline(client.Conn)
-		return nil
-	})
-
 	// set SetPingHandler to read incoming "ping" message. Used to increase SetReadDeadline
 	client.Conn.SetPingHandler(func(string) error {
 		log.Println(PingReceivedClient)
+		sendPongMessage(client.Conn)
 		updateReadDeadline(client.Conn)
 		return nil
 	})
@@ -194,20 +189,14 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 	// subscribe to pubsub TopicNameChatroom
 	sub := redisClient.Subscribe(ctx, client.Topic)
 	defer func() {
-		// close client connection only
-		err := client.Conn.Close()
-		if err != nil {
-			log.Println(ErrorUnableToCloseWs, err)
-			return
-		}
+		disconnect(client)
 		// stop listening to pubsub TopicNameChatroom
-		err = sub.Close()
+		err := sub.Close()
 		if err != nil {
 			log.Println(ErrorUnableToCloseRedis, err)
 			return
 		}
 	}()
-	go startPingMessage(client.Conn)
 	for {
 		select {
 		case message, ok := <-sub.Channel():
@@ -261,16 +250,14 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 	}
 }
 
-func startPingMessage(conn *websocket.Conn) {
-	// Start a goroutine to send pings periodically to the client
-	for {
-		time.Sleep(ws.PingPeriod) // Interval between pings
-		if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-			log.Printf(fmt.Sprintf(ErrorPingSentClient, err))
-			return
-		}
-		log.Println(PingSendClient)
+func sendPongMessage(conn *websocket.Conn) {
+	updateWriteDeadline(conn)
+	if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+		log.Printf(fmt.Sprintf(ErrorPongSentClient, err))
+		return
 	}
+	log.Println(PongSendClient)
+
 }
 
 func updateReadDeadline(conn *websocket.Conn) {
@@ -284,7 +271,6 @@ func updateReadDeadline(conn *websocket.Conn) {
 }
 
 func updateWriteDeadline(conn *websocket.Conn) {
-	updateWriteDeadline(conn)
 	// SetWriteDeadline to time.Now() + WriteWait
 	err := conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
 	if err != nil {

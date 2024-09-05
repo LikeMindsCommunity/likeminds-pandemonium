@@ -8,8 +8,10 @@ const (
 	PingReceivedClient      = "Received ping from client"
 	PongReceivedClient      = "Received pong from client"
 	PingSendClient          = "Sending ping to client"
+	PongSendClient          = "Sending pong to client"
 	ReceivedMessageClientWs = "Received message from client having message type as %v"
 	ReceivedMessageRedisWs  = "Received message from redis"
+	ConnectionClosed        = "Connection closed"
 )
 
 const (
@@ -36,6 +38,7 @@ const (
 	ErrorWriterOpenWs       = "Unable to open websocket Writer:"
 	ErrorWriterCloseWs      = "Unable to close websocket Writer:"
 	ErrorPingSentClient     = "Error sending ping to client: %v"
+	ErrorPongSentClient     = "Error sending pong to client: %v"
 )
 
 const (
