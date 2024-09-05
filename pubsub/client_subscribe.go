@@ -164,18 +164,26 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 		log.Println(ErrorReadDeadlineWs, err)
 		return
 	}
-	// set SetPongHandler to read incoming "ping" message. Used to increase SetReadDeadline
-	client.Conn.SetPingHandler(func(string) error {
-		log.Println(PingWs)
+
+	// set SetPongHandler to read incoming "pong" message. Used to increase SetReadDeadline
+	client.Conn.SetPongHandler(func(string) error {
+		log.Println(PongReceivedWs)
 		// update SetReadDeadline to time.Now() + PongWait
 		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 		if err != nil {
 			log.Println(ErrorReadDeadlineWs, err)
 			return err
 		}
-		// Respond to the ping with a pong
-		if err := client.Conn.WriteMessage(websocket.PongMessage, nil); err != nil {
-			log.Printf("Error sending pong response: %v", err)
+		return nil
+	})
+
+	// set SetPingHandler to read incoming "ping" message. Used to increase SetReadDeadline
+	client.Conn.SetPingHandler(func(string) error {
+		log.Println(PingReceivedWs)
+		// update SetReadDeadline to time.Now() + PongWait
+		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
+		if err != nil {
+			log.Println(ErrorReadDeadlineWs, err)
 			return err
 		}
 		return nil
@@ -215,6 +223,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 			return
 		}
 	}()
+	go startPingMessage(client.Conn)
 	for {
 		select {
 		case message, ok := <-sub.Channel():
@@ -270,5 +279,17 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 				log.Println(ReceivedMessageRedisWs)
 			}
 		}
+	}
+}
+
+func startPingMessage(conn *websocket.Conn) {
+	// Start a goroutine to send pings periodically to the client
+	for {
+		time.Sleep(ws.PingPeriod) // Interval between pings
+		if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			log.Printf(fmt.Sprintf(ErrorPingSentWs, err))
+			return
+		}
+		log.Println(PingSendWs)
 	}
 }

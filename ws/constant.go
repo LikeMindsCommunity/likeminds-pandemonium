@@ -8,4 +8,7 @@ const (
 
 	// PongWait Max time till next pong from peer
 	PongWait = 60 * time.Second
+
+	// PingPeriod should be less than PongWait
+	PingPeriod = ((60 * time.Second) * 9) / 10
 )

@@ -5,7 +5,9 @@ const (
 	ReadBufferSizeDefault   = 4096
 	WriteBufferSizeDefault  = 4096
 	WsConnectionEstablished = "Connected to websocket server"
-	PingWs                  = "Received ping from client"
+	PingReceivedWs          = "Received ping from client"
+	PongReceivedWs          = "Received pong from client"
+	PingSendWs              = "Sending ping to client"
 	ReceivedMessageClientWs = "Received message from client having message type as %v"
 	ReceivedMessageRedisWs  = "Received message from redis"
 )
@@ -33,6 +35,7 @@ const (
 	ErrorUnableToWriteWs    = "Unable to write message in websocket:"
 	ErrorWriterOpenWs       = "Unable to open websocket Writer:"
 	ErrorWriterCloseWs      = "Unable to close websocket Writer:"
+	ErrorPingSentWs         = "Error sending ping to client: %v"
 )
 
 const (
