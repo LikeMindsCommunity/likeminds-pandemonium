@@ -157,35 +157,19 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 		disconnect(client)
 	}()
 
-	//client.conn.SetReadLimit(maxMessageSize)
-	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
-	err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
-	if err != nil {
-		log.Println(ErrorReadDeadlineWs, err)
-		return
-	}
+	updateReadDeadline(client.Conn)
 
 	// set SetPongHandler to read incoming "pong" message. Used to increase SetReadDeadline
 	client.Conn.SetPongHandler(func(string) error {
 		log.Println(PongReceivedClient)
-		// update SetReadDeadline to time.Now() + PongWait
-		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
-		if err != nil {
-			log.Println(ErrorReadDeadlineWs, err)
-			return err
-		}
+		updateReadDeadline(client.Conn)
 		return nil
 	})
 
 	// set SetPingHandler to read incoming "ping" message. Used to increase SetReadDeadline
 	client.Conn.SetPingHandler(func(string) error {
 		log.Println(PingReceivedClient)
-		// update SetReadDeadline to time.Now() + PongWait
-		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
-		if err != nil {
-			log.Println(ErrorReadDeadlineWs, err)
-			return err
-		}
+		updateReadDeadline(client.Conn)
 		return nil
 	})
 
@@ -227,12 +211,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 	for {
 		select {
 		case message, ok := <-sub.Channel():
-			// SetWriteDeadline to time.Now() + WriteWait
-			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
-			if err != nil {
-				log.Println(ErrorWriteDeadlineWs, err)
-				return
-			}
+			updateWriteDeadline(client.Conn)
 			if !ok {
 				// The SubscribeWsServer closed the channel.
 				err := client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
@@ -291,5 +270,25 @@ func startPingMessage(conn *websocket.Conn) {
 			return
 		}
 		log.Println(PingSendClient)
+	}
+}
+
+func updateReadDeadline(conn *websocket.Conn) {
+	//client.conn.SetReadLimit(maxMessageSize)
+	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
+	err := conn.SetReadDeadline(time.Now().Add(ws.PongWait))
+	if err != nil {
+		log.Println(ErrorReadDeadlineWs, err)
+		return
+	}
+}
+
+func updateWriteDeadline(conn *websocket.Conn) {
+	updateWriteDeadline(conn)
+	// SetWriteDeadline to time.Now() + WriteWait
+	err := conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
+	if err != nil {
+		log.Println(ErrorWriteDeadlineWs, err)
+		return
 	}
 }
