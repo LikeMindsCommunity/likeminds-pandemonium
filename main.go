@@ -14,6 +14,11 @@ var (
 	router *gin.Engine
 )
 
+const (
+	// AppVersion | current application version
+	AppVersion string = "0.1.0"
+)
+
 func main() {
 	initGin()
 	redisClient := pubsub.InitRedisClient()
