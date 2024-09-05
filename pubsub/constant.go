@@ -1,9 +1,17 @@
 package pubsub
 
 const (
-	RedisClient            = "redis_client"
-	ReadBufferSizeDefault  = 4096
-	WriteBufferSizeDefault = 4096
+	RedisClient             = "redis_client"
+	ReadBufferSizeDefault   = 4096
+	WriteBufferSizeDefault  = 4096
+	WsConnectionEstablished = "Connected to websocket server"
+	PingReceivedClient      = "Received ping from client"
+	PongReceivedClient      = "Received pong from client"
+	PingSendClient          = "Sending ping to client"
+	PongSendClient          = "Sending pong to client"
+	ReceivedMessageClientWs = "Received message from client having message type as %v"
+	ReceivedMessageRedisWs  = "Received message from redis"
+	ConnectionClosed        = "Connection closed"
 )
 
 const (
@@ -18,16 +26,19 @@ const (
 )
 
 const (
+	ErrorFailedUpgrader     = "Failed to upgrade connection: %v"
 	ErrorPublishRedis       = "Publish error on redis:"
-	ErrorUnexpectedCloseWs  = "Unexpected close error on Ws:"
-	ErrorReadDeadlineWs     = "Error while setting ReadDeadline on Ws:"
-	ErrorWriteDeadlineWs    = "Error while setting WriteDeadline on Ws:"
+	ErrorReadClientWs       = "Error reading message from client: %v"
+	ErrorReadDeadlineWs     = "Error while setting ReadDeadline on websocket:"
+	ErrorWriteDeadlineWs    = "Error while setting WriteDeadline on websocket:"
 	ErrorUnableToCloseWs    = "Unable to close ws error:"
 	ErrorUnableToCloseRedis = "Unable to close redis error:"
 	ErrorUnmarshalErrorJson = "Unmarshal error:"
-	ErrorUnableToWriteWs    = "Unable to write message in Ws:"
-	ErrorWriterOpenWs       = "Unable to open Ws Writer:"
-	ErrorWriterCloseWs      = "Unable to close Ws Writer:"
+	ErrorUnableToWriteWs    = "Unable to write message in websocket:"
+	ErrorWriterOpenWs       = "Unable to open websocket Writer:"
+	ErrorWriterCloseWs      = "Unable to close websocket Writer:"
+	ErrorPingSentClient     = "Error sending ping to client: %v"
+	ErrorPongSentClient     = "Error sending pong to client: %v"
 )
 
 const (

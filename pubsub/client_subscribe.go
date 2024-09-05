@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
@@ -67,7 +68,12 @@ func Subscribe() gin.HandlerFunc {
 				return
 			}
 
-			ServeWs(topic, UUID, deviceID, createOrGetWsServer(topic), c.Writer, c.Request, GetRedisClientFromContext(c))
+			err = ServeWs(topic, UUID, deviceID, createOrGetWsServer(topic), c.Writer, c.Request, GetRedisClientFromContext(c))
+			if err != nil {
+				updatedErr := fmt.Sprintf(ErrorFailedUpgrader, err)
+				api.GeneralAPIError(c, updatedErr)
+				return
+			}
 		case TopicTypeCommunity:
 			UUID := c.GetHeader(constant.HeadersMemberId)
 			deviceID := c.GetHeader(constant.HeadersDeviceId)
@@ -87,9 +93,13 @@ func Subscribe() gin.HandlerFunc {
 			}
 			wsServer := createOrGetWsServer(topic)
 			redisClient := GetRedisClientFromContext(c)
-			ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
+			err = ServeWs(topic, UUID, deviceID, wsServer, c.Writer, c.Request, redisClient)
+			if err != nil {
+				updatedErr := fmt.Sprintf(ErrorFailedUpgrader, err)
+				api.GeneralAPIError(c, updatedErr)
+				return
+			}
 		}
-
 	}
 }
 
@@ -106,11 +116,10 @@ func createOrGetWsServer(topic string) *ws.WsServer {
 }
 
 // ServeWs handles websocket requests of a chatroom from clients requests.
-func ServeWs(topic string, UUID string, deviceID string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) {
+func ServeWs(topic string, UUID string, deviceID string, wsServer *ws.WsServer, w http.ResponseWriter, r *http.Request, redisClient *redis.Client) error {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
 	client := ws.NewClient(conn, wsServer, UUID, deviceID, topic)
@@ -119,10 +128,13 @@ func ServeWs(topic string, UUID string, deviceID string, wsServer *ws.WsServer, 
 	go readPump(client, redisClient)
 
 	wsServer.Register <- client
+	log.Println(WsConnectionEstablished)
+	return nil
 }
 
 // disconnect closes connection and clears client
 func disconnect(client *ws.Client) {
+	log.Println(ConnectionClosed)
 	unregisterFromServer(client)
 	err := client.Conn.Close()
 	if err != nil {
@@ -146,33 +158,24 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 		disconnect(client)
 	}()
 
-	//client.conn.SetReadLimit(maxMessageSize)
-	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
-	err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
-	if err != nil {
-		log.Println(ErrorReadDeadlineWs, err)
-		return
-	}
-	// set SetPongHandler to read incoming "ping" message through ticker. Used to increase SetReadDeadline
-	client.Conn.SetPongHandler(func(string) error {
-		// update SetReadDeadline to time.Now() + PongWait
-		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
-		if err != nil {
-			log.Println(ErrorReadDeadlineWs, err)
-			return err
-		}
+	updateReadDeadline(client.Conn)
+
+	// set SetPingHandler to read incoming "ping" message. Used to increase SetReadDeadline
+	client.Conn.SetPingHandler(func(string) error {
+		log.Println(PingReceivedClient)
+		sendPongMessage(client.Conn)
+		updateReadDeadline(client.Conn)
 		return nil
 	})
 
 	// Start endless read loop, waiting for messages from client
 	for {
-		_, jsonMessage, err := client.Conn.ReadMessage()
+		messageType, jsonMessage, err := client.Conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Println(ErrorUnexpectedCloseWs, err)
-			}
+			log.Println(fmt.Sprintf(ErrorReadClientWs, err))
 			return
 		}
+		log.Println(fmt.Sprintf(ReceivedMessageClientWs, messageType))
 		// publish jsonMessage to pubsub TopicNameChatroom
 		if err := redisClient.Publish(ctx, client.Topic, jsonMessage).Err(); err != nil {
 			log.Println(ErrorPublishRedis, err)
@@ -185,19 +188,10 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 func writePump(client *ws.Client, redisClient *redis.Client) {
 	// subscribe to pubsub TopicNameChatroom
 	sub := redisClient.Subscribe(ctx, client.Topic)
-	// start ticker at regular interval of PingPeriod
-	ticker := time.NewTicker(ws.PingPeriod)
 	defer func() {
-		// stop ticker
-		ticker.Stop()
-		// close client connection only
-		err := client.Conn.Close()
-		if err != nil {
-			log.Println(ErrorUnableToCloseWs, err)
-			return
-		}
+		disconnect(client)
 		// stop listening to pubsub TopicNameChatroom
-		err = sub.Close()
+		err := sub.Close()
 		if err != nil {
 			log.Println(ErrorUnableToCloseRedis, err)
 			return
@@ -206,12 +200,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 	for {
 		select {
 		case message, ok := <-sub.Channel():
-			// SetWriteDeadline to time.Now() + WriteWait
-			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
-			if err != nil {
-				log.Println(ErrorWriteDeadlineWs, err)
-				return
-			}
+			updateWriteDeadline(client.Conn)
 			if !ok {
 				// The SubscribeWsServer closed the channel.
 				err := client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
@@ -255,19 +244,37 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 					log.Println(ErrorWriterCloseWs, err)
 					return
 				}
-			}
-		case <-ticker.C:
-			// At regular interval of PingPeriod, update SetWriteDeadline to time.Now() + WriteWait
-			err := client.Conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
-			if err != nil {
-				log.Println(ErrorWriteDeadlineWs, err)
-				return
-			}
-			// Write message of type websocket.PingMessage
-			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Println(ErrorUnableToWriteWs, err)
-				return
+				log.Println(ReceivedMessageRedisWs)
 			}
 		}
+	}
+}
+
+func sendPongMessage(conn *websocket.Conn) {
+	updateWriteDeadline(conn)
+	if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+		log.Printf(fmt.Sprintf(ErrorPongSentClient, err))
+		return
+	}
+	log.Println(PongSendClient)
+
+}
+
+func updateReadDeadline(conn *websocket.Conn) {
+	//client.conn.SetReadLimit(maxMessageSize)
+	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
+	err := conn.SetReadDeadline(time.Now().Add(ws.PongWait))
+	if err != nil {
+		log.Println(ErrorReadDeadlineWs, err)
+		return
+	}
+}
+
+func updateWriteDeadline(conn *websocket.Conn) {
+	// SetWriteDeadline to time.Now() + WriteWait
+	err := conn.SetWriteDeadline(time.Now().Add(ws.WriteWait))
+	if err != nil {
+		log.Println(ErrorWriteDeadlineWs, err)
+		return
 	}
 }
