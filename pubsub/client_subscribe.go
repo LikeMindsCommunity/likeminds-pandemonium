@@ -167,7 +167,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 
 	// set SetPongHandler to read incoming "pong" message. Used to increase SetReadDeadline
 	client.Conn.SetPongHandler(func(string) error {
-		log.Println(PongReceivedWs)
+		log.Println(PongReceivedClient)
 		// update SetReadDeadline to time.Now() + PongWait
 		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 		if err != nil {
@@ -179,7 +179,7 @@ func readPump(client *ws.Client, redisClient *redis.Client) {
 
 	// set SetPingHandler to read incoming "ping" message. Used to increase SetReadDeadline
 	client.Conn.SetPingHandler(func(string) error {
-		log.Println(PingReceivedWs)
+		log.Println(PingReceivedClient)
 		// update SetReadDeadline to time.Now() + PongWait
 		err := client.Conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 		if err != nil {
@@ -287,9 +287,9 @@ func startPingMessage(conn *websocket.Conn) {
 	for {
 		time.Sleep(ws.PingPeriod) // Interval between pings
 		if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-			log.Printf(fmt.Sprintf(ErrorPingSentWs, err))
+			log.Printf(fmt.Sprintf(ErrorPingSentClient, err))
 			return
 		}
-		log.Println(PingSendWs)
+		log.Println(PingSendClient)
 	}
 }
