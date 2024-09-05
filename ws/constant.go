@@ -10,5 +10,5 @@ const (
 	PongWait = 60 * time.Second
 
 	// PingPeriod should be less than PongWait
-	PingPeriod = ((60 * time.Second) * 9) / 10
+	PingPeriod = ((PongWait * time.Second) * 9) / 10
 )
