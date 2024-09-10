@@ -5,5 +5,6 @@ type ConversationResponse struct {
 }
 
 type Conversation struct {
-	Member Member `json:"member"`
+	Member       Member   `json:"member"`
+	Participants []string `json:"participants"`
 }
