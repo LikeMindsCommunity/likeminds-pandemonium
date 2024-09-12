@@ -229,7 +229,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 					(client.DeviceID != "" && client.DeviceID == response.DeviceID) {
 					continue
 				}
-				participants := conversationResponse.Conversation.Participants
+				participants := conversationResponse.Participants
 				if participants != nil {
 					if !api.Contains(participants, client.UUID) {
 						continue
