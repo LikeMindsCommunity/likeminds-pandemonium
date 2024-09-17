@@ -230,7 +230,7 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 					continue
 				}
 				participants := conversationResponse.Participants
-				if participants != nil {
+				if participants != nil && len(participants) > 0 {
 					if !api.Contains(participants, client.UUID) {
 						continue
 					}
