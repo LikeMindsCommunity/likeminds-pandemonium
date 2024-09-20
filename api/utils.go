@@ -45,3 +45,13 @@ func GeneralBadRequestError(c *gin.Context, errorMessage string) {
 		ErrorMessage: errorMessage,
 	})
 }
+
+// Contains Function to check if a string is present in a slice of strings
+func Contains(slice []string, item string) bool {
+	for _, str := range slice {
+		if str == item {
+			return true
+		}
+	}
+	return false
+}

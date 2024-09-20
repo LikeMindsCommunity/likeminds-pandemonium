@@ -229,6 +229,12 @@ func writePump(client *ws.Client, redisClient *redis.Client) {
 					(client.DeviceID != "" && client.DeviceID == response.DeviceID) {
 					continue
 				}
+				participants := conversationResponse.Participants
+				if participants != nil && len(participants) > 0 {
+					if !api.Contains(participants, client.UUID) {
+						continue
+					}
+				}
 				// Create NextWriter of type websocket.TextMessage
 				w, err := client.Conn.NextWriter(websocket.TextMessage)
 				if err != nil {
