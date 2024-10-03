@@ -22,18 +22,9 @@ func NewResponse(deviceID string, topicMessageType string, rawData string) *Resp
 	return &Response{DeviceID: deviceID, TopicMessageType: topicMessageType, RawData: rawData}
 }
 
-// InitRedisClient creates a new PublishWithMethod Client
-func InitRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:     common.GoDotEnvVariable("REDIS_DSN"),
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-}
-
 // GetRedisClientFromContext Exposed api method to get pubsub client from context
 func GetRedisClientFromContext(c *gin.Context) *redis.Client {
-	redisClient, exists := c.Get(RedisClient)
+	redisClient, exists := c.Get(common.RedisClient)
 	if !exists {
 		return nil
 	}
@@ -43,11 +34,11 @@ func GetRedisClientFromContext(c *gin.Context) *redis.Client {
 // GetTopicSplit will decode topic and return split
 func GetTopicSplit(topic string) ([]string, error) {
 	if topic == "" || topic == "null" {
-		return nil, errors.New(ErrorTopicMissing)
+		return nil, errors.New(common.ErrorTopicMissing)
 	}
 	topicSplit := strings.Split(topic, ":")
 	if len(topicSplit) <= 1 {
-		return nil, errors.New(ErrorTopicInvalid)
+		return nil, errors.New(common.ErrorTopicInvalid)
 	}
 	return topicSplit, nil
 }

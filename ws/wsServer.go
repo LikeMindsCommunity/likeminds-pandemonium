@@ -1,6 +1,12 @@
 package ws
 
-import "github.com/gorilla/websocket"
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"likeminds-pandemonium/common"
+)
 
 // Client represents the websocket client connected with the server
 type Client struct {
@@ -23,6 +29,10 @@ type WsServer struct {
 	Unregister chan *Client
 }
 
+type WsServerParent struct {
+	WsServers map[string]*WsServer
+}
+
 // NewClient creates new client which will be added to WsServer
 func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID string, topic string) *Client {
 	return &Client{
@@ -32,6 +42,34 @@ func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID s
 		DeviceID: deviceID,
 		Topic:    topic,
 	}
+}
+
+// SendPayloadToClientConnection sends the payload to the client's WebSocket connection
+func (client *Client) SendPayloadToClientConnection(payload interface{}) error {
+	// Marshal the payload into JSON bytes
+	messagePayloadByte, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
+	}
+
+	// Create NextWriter of type websocket.TextMessage
+	w, err := client.Conn.NextWriter(websocket.TextMessage)
+	if err != nil {
+		return fmt.Errorf(common.ErrorWriterOpenWs, err)
+	}
+
+	// Write the payload to the WebSocket connection
+	_, err = w.Write(messagePayloadByte)
+	if err != nil {
+		return fmt.Errorf(common.ErrorUnableToWriteWs, err)
+	}
+
+	// Close the writer
+	if err := w.Close(); err != nil {
+		return fmt.Errorf(common.ErrorWriterCloseWs, err)
+	}
+
+	return nil
 }
 
 // NewWebsocketServer creates a new WsServer type
@@ -70,4 +108,49 @@ func (server *WsServer) unregisterClient(client *Client) {
 // GetClientsCount to return clients count connected on WsServer
 func (server *WsServer) GetClientsCount() int {
 	return len(server.clients)
+}
+
+// FindClientByUUID searches through the clients map and returns the client where UUID == senderUUID
+func (server *WsServer) FindClientByUUID(senderUUID string) (*Client, bool) {
+	// Loop through the clients in the map
+	for client := range server.clients {
+		if client.UUID == senderUUID {
+			return client, true // Return the matched client
+		}
+	}
+	return nil, false // Return nil and false if no match found
+}
+
+// NewWsServerParent creates a new WsServerParent
+func NewWsServerParent() *WsServerParent {
+	return &WsServerParent{
+		WsServers: make(map[string]*WsServer),
+	}
+}
+
+// GetWsServerParentFromContext Exposed api method to get WsServerParent from context
+func GetWsServerParentFromContext(c *gin.Context) *WsServerParent {
+	redisClient, exists := c.Get(common.WsServerKey)
+	if !exists {
+		return nil
+	}
+	return redisClient.(*WsServerParent)
+}
+
+// GetWsServer returns the WsServer for the given topic from WsServerParent
+func (parent *WsServerParent) GetWsServer(topic string) *WsServer {
+	// Return the WsServer associated with the topic, or nil if not found
+	return parent.WsServers[topic]
+}
+
+// GetConnectionFromWsServer function to get WebSocket connection from the server
+func (parent *WsServerParent) GetConnectionFromWsServer(topic string, senderUUID string) *Client {
+	wsServer := parent.GetWsServer(topic)
+	if wsServer != nil {
+		wsServerClient, found := wsServer.FindClientByUUID(senderUUID)
+		if found {
+			return wsServerClient
+		}
+	}
+	return nil
 }

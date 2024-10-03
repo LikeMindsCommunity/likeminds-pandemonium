@@ -6,5 +6,7 @@ type ConversationResponse struct {
 }
 
 type Conversation struct {
-	Member Member `json:"member"`
+	ID         string `json:"id"`
+	ChatroomID string `json:"chatroom_id"`
+	Member     Member `json:"member"`
 }
