@@ -12,7 +12,7 @@ const (
 	TopicTypeCommunity           = "community"
 	TopicMessageTypeConversation = "conversation"
 	TopicMessageTypeSentReport   = "sent_report"
-	ChatroomDeliveryReportPrefix = "chatroom_%s_delivery_report" // Redis key prefix for chatroom delivery reports
+	ChatroomDeliveryReportPrefix = "chatroom_%v_delivery_report" // Redis key prefix for chatroom delivery reports
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer

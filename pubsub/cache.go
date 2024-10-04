@@ -18,7 +18,7 @@ func InitRedisClient() *redis.Client {
 }
 
 // SaveHashSet saves any value in an HSet with a specified TTL (Time to Live)
-func SaveHashSet(redisClient *redis.Client, hashKey string, field string, value interface{}, ttl time.Duration) error {
+func SaveHashSet(redisClient *redis.Client, hashKey string, field interface{}, value interface{}, ttl time.Duration) error {
 	// Marshal the struct into a JSON format to save in Redis HSET
 	valueBytes, err := json.Marshal(value)
 	if err != nil {

@@ -6,7 +6,7 @@ type ConversationResponse struct {
 }
 
 type Conversation struct {
-	ID         string `json:"id"`
-	ChatroomID string `json:"chatroom_id"`
-	Member     Member `json:"member"`
+	ID         interface{} `json:"id"`
+	ChatroomID interface{} `json:"chatroom_id"`
+	Member     Member      `json:"member"`
 }

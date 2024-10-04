@@ -98,6 +98,7 @@ func createOrGetWsServer(wsServerParent *ws.WsServerParent, topic string) *ws.Ws
 	if wsServer == nil {
 		wsServer = ws.NewWebsocketServer()
 		go wsServer.Run()
+		wsServerParent.WsServers[topic] = wsServer
 	}
 	return wsServer
 }
