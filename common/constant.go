@@ -18,9 +18,10 @@ const (
 	// PongWait Max time till next pong from peer
 	PongWait = 60 * time.Second
 	// PingPeriod should be less than PongWait
-	PingPeriod                    = (PongWait * 9) / 10
-	WsServerKey                   = "ws_server"
-	UserDeliveryReportFieldPrefix = "user_%v"
+	PingPeriod                      = (PongWait * 9) / 10
+	WsServerKey                     = "ws_server"
+	UserDeliveryReportFieldPrefix   = "user_%v"
+	TopicMessageTypeDeliveredReport = "delivered_report"
 )
 
 const (

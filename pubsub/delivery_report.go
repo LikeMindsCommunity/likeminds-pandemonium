@@ -42,8 +42,8 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 	if err != nil {
 		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
 	}
-	sentReportResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentReport, string(sentReportBytes))
 
+	sentReportResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentReport, string(sentReportBytes))
 	userUUID := conversationResponse.Conversation.Member.UUID
 	// Use the generic SaveToCacheGeneric function to save the value to Redis
 	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDeliveryReportFieldPrefix, userUUID), sentReportResponse, 7*24*time.Hour); err != nil {
@@ -55,6 +55,43 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 	if client != nil {
 		// Send payload to the client using WebSocket
 		if err := client.SendPayloadToClientConnection(sentReportResponse); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UpdateDeliveredReport Function to update the cache and send payload for Delivered Report
+func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response, receiverUUID string) error {
+	var conversationResponse models.ConversationResponse
+	if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
+		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
+	}
+
+	// Create a DeliveryReport struct instance
+	deliveryReport := SentReport{
+		Timestamp: time.Now().UnixMilli(),
+	}
+	// Marshal the payload into JSON bytes
+	reportBytes, err := json.Marshal(deliveryReport)
+	if err != nil {
+		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
+	}
+	reportResponse := NewResponse(response.DeviceID, common.TopicMessageTypeDeliveredReport, string(reportBytes))
+	// Use the generic SaveToCacheGeneric function to save the value to Redis
+	communityID := conversationResponse.Conversation.CommunityID
+	cacheKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
+	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDeliveryReportFieldPrefix, receiverUUID), reportResponse, 7*24*time.Hour); err != nil {
+		return err
+	}
+
+	// Send payload to the user who sent the conversation and is still active
+	userUUID := conversationResponse.Conversation.Member.UUID
+	client := wsServerParent.GetConnectionFromWsServer(topic, userUUID)
+	if client != nil {
+		// Send payload to the client using WebSocket
+		if err := client.SendPayloadToClientConnection(reportResponse); err != nil {
 			return err
 		}
 	}

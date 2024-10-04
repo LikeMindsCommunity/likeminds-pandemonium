@@ -113,7 +113,7 @@ func ServeWs(wsServerParent *ws.WsServerParent, topic string, UUID string, devic
 	wsServer := createOrGetWsServer(wsServerParent, topic)
 	client := ws.NewClient(conn, wsServer, UUID, deviceID, topic)
 
-	go writePump(wsServerParent, client, redisClient)
+	go writePump(wsServerParent, client, redisClient, topic)
 	go readPump(wsServerParent, client, redisClient)
 
 	wsServer.Register <- client
@@ -174,7 +174,7 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 }
 
 // writePump to send message from server to client
-func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient *redis.Client) {
+func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient *redis.Client, topic string) {
 	// subscribe to pubsub TopicNameChatroom
 	sub := redisClient.Subscribe(ctx, client.Topic)
 	defer func() {
@@ -240,6 +240,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 					return
 				}
 				log.Println(common.ReceivedMessageRedisWs)
+				updateDeliveredReport(redisClient, wsServerParent, topic, &response, client.UUID)
 			}
 		}
 	}
@@ -271,5 +272,11 @@ func updateWriteDeadline(conn *websocket.Conn) {
 	if err != nil {
 		log.Println(common.ErrorWriteDeadlineWs, err)
 		return
+	}
+}
+
+func updateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response, receiverUUID string) {
+	if err := UpdateDeliveredReport(redisClient, wsServerParent, topic, response, receiverUUID); err != nil {
+		log.Println(err)
 	}
 }

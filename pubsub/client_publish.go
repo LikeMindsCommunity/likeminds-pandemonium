@@ -72,9 +72,6 @@ func updateSentReport(c *gin.Context, topic string, response *Response) {
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
 	if err := UpdateSentReport(redisClient, wsServerParent, topic, response); err != nil {
-		api.GeneralAPIError(c, err.Error())
 		log.Println(err)
-		return
 	}
-	api.GenerateResponse(c, nil)
 }
