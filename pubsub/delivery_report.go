@@ -12,10 +12,8 @@ import (
 
 // SentReport struct that holds the sent report data to be saved in Redis
 type SentReport struct {
-	SenderID       string      `json:"sender_id"`
-	ConversationID interface{} `json:"conversation_id"`
-	Timestamp      int64       `json:"timestamp"`
-	TotalCount     string      `json:"total_count"`
+	SenderUUID string `json:"sender_uuid"`
+	Timestamp  int64  `json:"timestamp"`
 }
 
 // UpdateSentReport Function to update the cache and send payload for Sent Report
@@ -26,17 +24,14 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 	}
 
 	senderUUID := conversationResponse.Conversation.Member.UUID
-	conversationID := conversationResponse.Conversation.ID
-	chatroomID := conversationResponse.Conversation.ChatroomID
+	communityID := conversationResponse.Conversation.CommunityID
 	// Generate the cache key for the sent report
-	cacheKey := fmt.Sprintf(common.ChatroomDeliveryReportPrefix, chatroomID)
+	cacheKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
 
 	// Create a SentReport struct instance
 	sentReport := SentReport{
-		SenderID:       senderUUID,
-		ConversationID: conversationID,
-		Timestamp:      time.Now().UnixMilli(),
-		TotalCount:     "", // This would be calculated dynamically, set to empty for now
+		SenderUUID: senderUUID,
+		Timestamp:  time.Now().UnixMilli(),
 	}
 	// Marshal the payload into JSON bytes
 	sentReportBytes, err := json.Marshal(sentReport)
@@ -46,7 +41,7 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 	sentReportResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentReport, string(sentReportBytes))
 
 	// Use the generic SaveToCacheGeneric function to save the value to Redis
-	if err := SaveHashSet(redisClient, cacheKey, conversationID, sentReportResponse, 7*24*time.Hour); err != nil {
+	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDeliveryReportFieldPrefix, senderUUID), sentReportResponse, 7*24*time.Hour); err != nil {
 		return err
 	}
 
