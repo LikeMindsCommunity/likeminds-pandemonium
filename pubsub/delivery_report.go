@@ -27,11 +27,7 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
-	communityID := conversationResponse.Conversation.CommunityID
 	conversationID := conversationResponse.Conversation.ID
-	// Generate the cache key for the sent report
-	cacheKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
-
 	// Create a SentReport struct instance
 	sentReport := SentReport{
 		Timestamp:      time.Now().UnixMilli(),
@@ -42,9 +38,11 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 	if err != nil {
 		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
 	}
-
 	sentReportResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentReport, string(sentReportBytes))
 	userUUID := conversationResponse.Conversation.Member.UUID
+	// Generate the cache key for the sent report
+	communityID := conversationResponse.Conversation.CommunityID
+	cacheKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
 	// Use the generic SaveToCacheGeneric function to save the value to Redis
 	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDeliveryReportFieldPrefix, userUUID), sentReportResponse, 7*24*time.Hour); err != nil {
 		return err
