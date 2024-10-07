@@ -166,8 +166,7 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 		}
 		log.Println(fmt.Sprintf(common.ReceivedMessageClientWs, messageType))
 		// publish jsonMessage to pubsub TopicNameChatroom
-		if err := redisClient.Publish(ctx, client.Topic, jsonMessage).Err(); err != nil {
-			log.Println(common.ErrorPublishRedis, err)
+		if err := PublishMessageToRedis(redisClient, client.Topic, jsonMessage); err != nil {
 			return
 		}
 	}
@@ -176,7 +175,10 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 // writePump to send message from server to client
 func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient *redis.Client, topic string) {
 	// subscribe to pubsub TopicNameChatroom
-	sub := redisClient.Subscribe(ctx, client.Topic)
+	sub, err := SubscribeToRedisTopic(redisClient, client.Topic)
+	if err != nil {
+		return
+	}
 	defer func() {
 		disconnect(wsServerParent, client)
 		// stop listening to pubsub TopicNameChatroom

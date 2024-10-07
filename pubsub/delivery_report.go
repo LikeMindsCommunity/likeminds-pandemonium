@@ -120,7 +120,7 @@ func DeliverReports(c *gin.Context) {
 	redisClient := GetRedisClientFromContext(c)
 
 	// Fetch the delivery report from Redis using HGET
-	drCacheValue, err := redisClient.HGet(c, communityDRKey, userDRField).Result()
+	drCacheValue, err := FetchFieldFromHashSet(redisClient, communityDRKey, userDRField)
 	if err != nil {
 		api.GeneralStatusNotFoundError(c, "Failed to fetch delivery report: "+err.Error())
 		log.Println("Error fetching delivery report:", err)

@@ -38,7 +38,8 @@ const (
 
 const (
 	ErrorFailedUpgrader        = "failed to upgrade connection: %v"
-	ErrorPublishRedis          = "publish error on redis:"
+	ErrorPublishRedis          = "failed to publish message to topic %s: %v"
+	ErrorSubscribeRedis        = "failed to subscribe to topic %s: %v"
 	ErrorReadClientWs          = "error reading message from client: %v"
 	ErrorReadDeadlineWs        = "error while setting ReadDeadline on websocket:"
 	ErrorWriteDeadlineWs       = "error while setting WriteDeadline on websocket:"

@@ -58,9 +58,8 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 
 	redisClient := GetRedisClientFromContext(c)
 	// publish rawData to pubsub channel:<chatroomID>
-	if err := redisClient.Publish(ctx, topic, responseBytes).Err(); err != nil {
+	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
 		api.GeneralAPIError(c, err.Error())
-		log.Println(common.ErrorPublishRedis, err)
 		return nil
 	}
 	api.GenerateResponse(c, nil)

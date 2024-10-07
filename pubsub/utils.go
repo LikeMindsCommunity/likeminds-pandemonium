@@ -1,15 +1,12 @@
 package pubsub
 
 import (
-	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/common"
 	"strings"
 )
-
-var ctx = context.Background()
 
 type Response struct {
 	DeviceID         string `json:"device_id"`
