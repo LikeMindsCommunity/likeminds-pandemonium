@@ -5,11 +5,12 @@ const (
 )
 
 const (
-	RedisPublish   = "/publish/:topic"
-	RedisSubscribe = "/subscribe/:topic"
+	RedisPublish    = "/publish/:topic"
+	RedisSubscribe  = "/subscribe/:topic"
+	DeliveryReports = "/deliver_reports"
 )
 
 const (
-	HeadersMemberId = "x-member-id"
-	HeadersDeviceId = "x-device-id"
+	HeadersMemberID = "x-member-id"
+	HeadersDeviceID = "x-device-id"
 )

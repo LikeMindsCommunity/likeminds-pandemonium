@@ -42,15 +42,15 @@ func Subscribe() gin.HandlerFunc {
 
 		switch topicSplit[0] {
 		case common.TopicTypeChatroom:
-			UUID := c.GetHeader(constant.HeadersMemberId)
-			deviceID := c.GetHeader(constant.HeadersDeviceId)
+			UUID := c.GetHeader(constant.HeadersMemberID)
+			deviceID := c.GetHeader(constant.HeadersDeviceID)
 			var chatroomID string
 			if len(topicSplit) > 1 {
 				chatroomID = topicSplit[1]
 			}
 			//Close connection if UUID sent in headers is invalid when subscribed to TopicTypeChatroom
 			if UUID == "" || UUID == "null" {
-				api.GeneralBadRequestError(c, common.ErrorUserUUIDMissing)
+				api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
 				return
 			}
 			//Close connection if chatroom ID sent in request is invalid when subscribed to TopicTypeChatroom
@@ -66,15 +66,15 @@ func Subscribe() gin.HandlerFunc {
 				return
 			}
 		case common.TopicTypeCommunity:
-			UUID := c.GetHeader(constant.HeadersMemberId)
-			deviceID := c.GetHeader(constant.HeadersDeviceId)
+			UUID := c.GetHeader(constant.HeadersMemberID)
+			deviceID := c.GetHeader(constant.HeadersDeviceID)
 			var communityID string
 			if len(topicSplit) > 1 {
 				communityID = topicSplit[1]
 			}
 			//Close connection if UUID sent in headers is invalid when subscribed to TopicTypeChatroom
 			if UUID == "" || UUID == "null" {
-				api.GeneralBadRequestError(c, common.ErrorUserUUIDMissing)
+				api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
 				return
 			}
 			//Close connection if community ID sent in request is invalid when subscribed to TopicTypeChatroom
