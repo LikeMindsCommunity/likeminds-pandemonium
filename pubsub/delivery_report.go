@@ -12,8 +12,9 @@ import (
 
 // SentReport struct that holds the sent report data to be saved in Redis
 type SentReport struct {
-	SenderUUID string `json:"sender_uuid"`
-	Timestamp  int64  `json:"timestamp"`
+	SenderUUID     string      `json:"sender_uuid"`
+	Timestamp      int64       `json:"timestamp"`
+	ConversationID interface{} `json:"conversation_id"`
 }
 
 // UpdateSentReport Function to update the cache and send payload for Sent Report
@@ -25,13 +26,15 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 
 	senderUUID := conversationResponse.Conversation.Member.UUID
 	communityID := conversationResponse.Conversation.CommunityID
+	conversationID := conversationResponse.Conversation.ID
 	// Generate the cache key for the sent report
 	cacheKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
 
 	// Create a SentReport struct instance
 	sentReport := SentReport{
-		SenderUUID: senderUUID,
-		Timestamp:  time.Now().UnixMilli(),
+		SenderUUID:     senderUUID,
+		Timestamp:      time.Now().UnixMilli(),
+		ConversationID: conversationID,
 	}
 	// Marshal the payload into JSON bytes
 	sentReportBytes, err := json.Marshal(sentReport)
