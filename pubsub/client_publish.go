@@ -37,11 +37,17 @@ func PublishWithMethod(c *gin.Context, method int) {
 				if response != nil {
 					updateSentReport(c, topic, response)
 				}
+			case common.TopicMessageTypeDeliveredReport:
+				// Handle the delivered_report case
+				updateDeliveredReportOnPublish(c, topic)
 			}
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				_ = publishRawDataOnTopic(c, topic, topicMessageType)
+			case common.TopicMessageTypeDeliveredReport:
+				// Handle the delivered_report case
+				updateDeliveredReportOnPublish(c, topic)
 			}
 		}
 	}
@@ -72,5 +78,34 @@ func updateSentReport(c *gin.Context, topic string, response *Response) {
 
 	if err := UpdateSentReport(redisClient, wsServerParent, topic, response); err != nil {
 		log.Println(err)
+	}
+}
+
+func updateDeliveredReportOnPublish(c *gin.Context, topic string) {
+	// Get the community_id from the query parameters
+	chatroomID := c.Param("chatroom_id")
+	if chatroomID == "" || chatroomID == "null" {
+		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
+		return
+	}
+	senderUUID := c.GetHeader(constant.HeadersMemberID)
+	deviceID := c.GetHeader(constant.HeadersDeviceID)
+	if senderUUID == "" || senderUUID == "null" {
+		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
+		return
+	}
+
+	// Get the list of receiver_uuids from the request body
+	var deliveredRequest DeliveredRequest
+	rawData, _ := c.GetRawData()
+	if err := json.Unmarshal(rawData, &deliveredRequest); err != nil {
+		log.Printf(common.ErrorUnmarshalErrorJson, err)
+	}
+	redisClient := GetRedisClientFromContext(c)
+	wsServerParent := ws.GetWsServerParentFromContext(c)
+	for _, receiverUUID := range deliveredRequest.ReceiverUUID {
+		if err := UpdateDeliveredReport(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
+			log.Println(err)
+		}
 	}
 }

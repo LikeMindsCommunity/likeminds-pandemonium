@@ -22,18 +22,16 @@ const (
 	WsServerKey                     = "ws_server"
 	UserDeliveryReportFieldPrefix   = "user_%v"
 	TopicMessageTypeDeliveredReport = "delivered_report"
+	ChatroomDeliveryReportPrefix    = "chatroom_%v_delivery_report"
 )
 
 const (
-	WsConnectionEstablished  = "connected to websocket server"
-	PingReceivedClient       = "received ping from client"
-	PongReceivedClient       = "received pong from client"
-	PingSendClient           = "sending ping to client"
-	PongSendClient           = "sending pong to client"
-	ReceivedMessageClientWs  = "received message from client having message type as %v"
-	ReceivedMessageRedisWs   = "received message from redis"
-	ConnectionClosed         = "connection closed"
-	LogSuccessCacheSaveRedis = "successfully set hash: %s with field: %s"
+	WsConnectionEstablished = "connected to websocket server"
+	PingReceivedClient      = "received ping from client"
+	PongSendClient          = "sending pong to client"
+	ReceivedMessageClientWs = "received message from client having message type as %v"
+	ReceivedMessageRedisWs  = "received message from redis"
+	ConnectionClosed        = "connection closed"
 )
 
 const (
@@ -49,12 +47,10 @@ const (
 	ErrorUnableToWriteWs       = "unable to write message in websocket: %v"
 	ErrorWriterOpenWs          = "unable to open websocket writer: %v"
 	ErrorWriterCloseWs         = "unable to close websocket writer: %v"
-	ErrorPingSentClient        = "error sending ping to client: %v"
 	ErrorPongSentClient        = "error sending pong to client: %v"
 	ErrorFailedCacheSaveRedis  = "failed to save cache: %v"
 	ErrorFailedExpSaveRedis    = "failed to save cache exp: %v"
 	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
-	ErrorCacheEmptyRedis       = "no data found for key: %s"
 	ErrorMarshalErrorJson      = "marshal error: %v"
 )
 
@@ -65,8 +61,4 @@ const (
 	ErrorTopicMessageTypeMissing = "topic message type is missing from params"
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
-	ErrorSenderIDMissing         = "sender ID is missing"       // New constant for missing sender ID
-	ErrorDeviceIDMissing         = "device ID is missing"       // New constant for missing device ID
-	ErrorConversationIDMissing   = "conversation ID is missing" // New constant for missing conversation ID
-	ErrorTimestampMissing        = "timestamp is missing"       // New constant for missing timestamp
 )
