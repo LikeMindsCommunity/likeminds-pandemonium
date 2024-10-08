@@ -96,9 +96,20 @@ func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServe
 	return nil
 }
 
+type CommunityDeliveryReportRequest struct {
+	CommunityID interface{} `json:"community_id"`
+}
+
 func CommunityDeliveryReport(c *gin.Context) {
-	// Get the community_id from the query parameters
-	communityID := c.Query("community_id")
+	// Step 1: Parse the request body to get the chatroom_id, user_uuids, page, and page_size
+	var requestBody CommunityDeliveryReportRequest
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
+		return
+	}
+
+	// Step 2: Get chatroom_id from body
+	communityID := requestBody.CommunityID
 	if communityID == "" || communityID == "null" {
 		api.GeneralBadRequestError(c, common.ErrorCommunityIDMissing)
 		return
@@ -142,9 +153,10 @@ func CommunityDeliveryReport(c *gin.Context) {
 }
 
 type ChatroomDeliveryReportRequest struct {
-	UserUUIDs []string `json:"user_uuids"`
-	Page      int      `json:"page"`
-	PageSize  int      `json:"page_size"`
+	ChatroomID interface{} `json:"chatroom_id"`
+	UserUUIDs  []string    `json:"user_uuids"`
+	Page       int         `json:"page"`
+	PageSize   int         `json:"page_size"`
 }
 
 type ChatroomDeliveryReportResponse struct {
@@ -155,17 +167,17 @@ type ChatroomDeliveryReportResponse struct {
 }
 
 func ChatroomDeliveryReport(c *gin.Context) {
-	// Step 1: Get chatroom_id from query parameters
-	chatroomID := c.Query("chatroom_id")
-	if chatroomID == "" || chatroomID == "null" {
-		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
-		return
-	}
-
-	// Step 2: Parse the request body to get the user_uuids, page, and page_size
+	// Step 1: Parse the request body to get the chatroom_id, user_uuids, page, and page_size
 	var requestBody ChatroomDeliveryReportRequest
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
 		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
+		return
+	}
+
+	// Step 2: Get chatroom_id from body
+	chatroomID := requestBody.ChatroomID
+	if chatroomID == "" || chatroomID == "null" {
+		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
 		return
 	}
 
@@ -187,7 +199,7 @@ func ChatroomDeliveryReport(c *gin.Context) {
 
 	// Step 6: Fetch all members from the ZSet (chatroom delivery reports)
 	// We use the FetchMembersFromZSet helper function to get members within the time range
-	allMembers, err := FetchMembersFromZSet(redisClient, redisKey, 0, float64(time.Now().Unix()))
+	allMembers, err := FetchMembersFromZSet(redisClient, redisKey, 0, float64(time.Now().UnixMilli()))
 	if err != nil {
 		api.GeneralAPIError(c, err.Error())
 		return
