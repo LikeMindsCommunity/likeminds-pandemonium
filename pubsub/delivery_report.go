@@ -10,7 +10,6 @@ import (
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
-	"log"
 	"time"
 )
 
@@ -101,14 +100,14 @@ func CommunityDeliveryReport(c *gin.Context) {
 	// Get the community_id from the query parameters
 	communityID := c.Query("community_id")
 	if communityID == "" || communityID == "null" {
-		api.GeneralBadRequestError(c, "community_id is required")
+		api.GeneralBadRequestError(c, common.ErrorCommunityIDMissing)
 		return
 	}
 
 	// Get x-member-id from headers
 	memberID := c.GetHeader(constant.HeadersMemberID)
 	if memberID == "" || memberID == "null" {
-		api.GeneralBadRequestError(c, "x-member-id is required")
+		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
 		return
 	}
 
@@ -122,13 +121,12 @@ func CommunityDeliveryReport(c *gin.Context) {
 	// Fetch the delivery report from Redis using HGET
 	drCacheValue, err := FetchFieldFromHashSet(redisClient, communityDRKey, userDRField)
 	if err != nil {
-		api.GeneralStatusNotFoundError(c, "Failed to fetch delivery report: "+err.Error())
-		log.Println("Error fetching delivery report:", err)
+		api.GeneralStatusNotFoundError(c, fmt.Sprintf(common.ErrorFailedCacheFetchRedis, err))
 		return
 	}
 
 	if drCacheValue == "" {
-		api.GeneralStatusNotFoundError(c, "No delivery report found for this user")
+		api.GeneralStatusNotFoundError(c, common.ErrorNoDeliveryReportFound)
 		return
 	}
 
@@ -136,8 +134,7 @@ func CommunityDeliveryReport(c *gin.Context) {
 	var drResponse Response
 	err = json.Unmarshal([]byte(drCacheValue), &drResponse)
 	if err != nil {
-		api.GeneralAPIError(c, "Error parsing delivery report: "+err.Error())
-		log.Println("Error unmarshalling delivery report:", err)
+		api.GeneralAPIError(c, fmt.Sprintf(common.ErrorUnmarshalErrorJson, err))
 		return
 	}
 
@@ -172,11 +169,6 @@ func ChatroomDeliveryReport(c *gin.Context) {
 		return
 	}
 
-	if len(requestBody.UserUUIDs) == 0 {
-		api.GeneralBadRequestError(c, common.ErrorUserUUIDsRequired)
-		return
-	}
-
 	// Step 3: Set default values for page and page size
 	page := requestBody.Page
 	pageSize := requestBody.PageSize
@@ -201,8 +193,13 @@ func ChatroomDeliveryReport(c *gin.Context) {
 		return
 	}
 
-	// Step 7: Filter members that match the provided user UUIDs
-	filteredMembers := filterMembersByUUIDs(allMembers, requestBody.UserUUIDs)
+	// Step 7: Filter members if user_uuids were provided in the request body
+	var filteredMembers []redis.Z
+	if len(requestBody.UserUUIDs) > 0 {
+		filteredMembers = filterMembersByUUIDs(allMembers, requestBody.UserUUIDs)
+	} else {
+		filteredMembers = allMembers
+	}
 
 	// Step 8: Apply pagination to the filtered members
 	startIndex := (page - 1) * pageSize

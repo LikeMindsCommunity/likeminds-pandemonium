@@ -53,7 +53,7 @@ const (
 	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
 	ErrorMarshalErrorJson      = "marshal error: %v"
 	ErrorInvalidJSONFormat     = "invalid JSON format: %v"
-	ErrorUserUUIDsRequired     = "user_uuids are required"
+	ErrorNoDeliveryReportFound = "no delivery report found for this user"
 )
 
 const (
