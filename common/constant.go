@@ -52,6 +52,8 @@ const (
 	ErrorFailedExpSaveRedis    = "failed to save cache exp: %v"
 	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
 	ErrorMarshalErrorJson      = "marshal error: %v"
+	ErrorInvalidJSONFormat     = "invalid JSON format: %v"
+	ErrorUserUUIDsRequired     = "user_uuids are required"
 )
 
 const (

@@ -21,10 +21,6 @@ type DeliveryReport struct {
 	UserUUID       interface{} `json:"user_uuid"`
 }
 
-type DeliveredRequest struct {
-	ReceiverUUID []string `json:"receiver_uuids"`
-}
-
 // UpdateSentReport Function to update the cache and send payload for Sent Report
 func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response) error {
 	var conversationResponse models.ConversationResponse
@@ -34,7 +30,7 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 
 	conversationID := conversationResponse.Conversation.ID
 	userUUID := conversationResponse.Conversation.Member.UUID
-	// Create a DeliveryReport struct instance
+	// Create a CommunityDeliveryReport struct instance
 	sentReport := DeliveryReport{
 		Timestamp:      time.Now().UnixMilli(),
 		ConversationID: conversationID,
@@ -68,12 +64,12 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 
 // UpdateDeliveredReport Function to update the cache and send payload for Delivered Report using ZSet
 func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, chatroomID interface{}, deviceID, senderUUID, receiverUUID string) error {
-	// Create a DeliveryReport struct instance with the current timestamp
+	// Create a CommunityDeliveryReport struct instance with the current timestamp
 	deliveryReport := DeliveryReport{
 		Timestamp: time.Now().UnixMilli(),
 		UserUUID:  receiverUUID,
 	}
-	// Marshal the DeliveryReport struct into JSON bytes
+	// Marshal the CommunityDeliveryReport struct into JSON bytes
 	reportBytes, err := json.Marshal(deliveryReport)
 	if err != nil {
 		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
@@ -101,7 +97,7 @@ func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServe
 	return nil
 }
 
-func DeliverReport(c *gin.Context) {
+func CommunityDeliveryReport(c *gin.Context) {
 	// Get the community_id from the query parameters
 	communityID := c.Query("community_id")
 	if communityID == "" || communityID == "null" {
@@ -146,4 +142,112 @@ func DeliverReport(c *gin.Context) {
 	}
 
 	api.GenerateResponse(c, drResponse)
+}
+
+type ChatroomDeliveryReportRequest struct {
+	UserUUIDs []string `json:"user_uuids"`
+	Page      int      `json:"page"`
+	PageSize  int      `json:"page_size"`
+}
+
+type ChatroomDeliveryReportResponse struct {
+	Reports  []map[string]interface{} `json:"reports"`
+	Page     int                      `json:"page"`
+	PageSize int                      `json:"page_size"`
+	Total    int                      `json:"total"`
+}
+
+func ChatroomDeliveryReport(c *gin.Context) {
+	// Step 1: Get chatroom_id from query parameters
+	chatroomID := c.Query("chatroom_id")
+	if chatroomID == "" || chatroomID == "null" {
+		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
+		return
+	}
+
+	// Step 2: Parse the request body to get the user_uuids, page, and page_size
+	var requestBody ChatroomDeliveryReportRequest
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
+		return
+	}
+
+	if len(requestBody.UserUUIDs) == 0 {
+		api.GeneralBadRequestError(c, common.ErrorUserUUIDsRequired)
+		return
+	}
+
+	// Step 3: Set default values for page and page size
+	page := requestBody.Page
+	pageSize := requestBody.PageSize
+	if page == 0 {
+		page = 1
+	}
+	if pageSize == 0 {
+		pageSize = 10
+	}
+
+	// Step 4: Construct the Redis key for the chatroom delivery report
+	redisKey := fmt.Sprintf(common.ChatroomDeliveryReportPrefix, chatroomID)
+
+	// Step 5: Get Redis client from context
+	redisClient := GetRedisClientFromContext(c)
+
+	// Step 6: Fetch all members from the ZSet (chatroom delivery reports)
+	// We use the FetchMembersFromZSet helper function to get members within the time range
+	allMembers, err := FetchMembersFromZSet(redisClient, redisKey, 0, float64(time.Now().Unix()))
+	if err != nil {
+		api.GeneralAPIError(c, err.Error())
+		return
+	}
+
+	// Step 7: Filter members that match the provided user UUIDs
+	filteredMembers := filterMembersByUUIDs(allMembers, requestBody.UserUUIDs)
+
+	// Step 8: Apply pagination to the filtered members
+	startIndex := (page - 1) * pageSize
+	endIndex := startIndex + pageSize
+	if endIndex > len(filteredMembers) {
+		endIndex = len(filteredMembers)
+	}
+	paginatedMembers := filteredMembers[startIndex:endIndex]
+
+	// Step 9: Prepare the response data
+	var reports []map[string]interface{}
+	for _, member := range paginatedMembers {
+		reports = append(reports, map[string]interface{}{
+			"timestamp": member.Score,
+			"user_uuid": member.Member,
+		})
+	}
+
+	// Step 10: Return the paginated result
+	response := ChatroomDeliveryReportResponse{
+		Reports:  reports,
+		Page:     page,
+		PageSize: pageSize,
+		Total:    len(filteredMembers), // Total is the size of the filtered members
+	}
+
+	// Step 11: Send the response back
+	c.JSON(200, response)
+}
+
+// Helper function to filter members by provided user UUIDs
+func filterMembersByUUIDs(members []redis.Z, userUUIDs []string) []redis.Z {
+	// Create a set of user UUIDs for faster lookup
+	uuidSet := make(map[string]bool)
+	for _, uuid := range userUUIDs {
+		uuidSet[uuid] = true
+	}
+
+	// Filter members based on user UUIDs
+	var filteredMembers []redis.Z
+	for _, member := range members {
+		if uuidSet[member.Member.(string)] {
+			filteredMembers = append(filteredMembers, member)
+		}
+	}
+
+	return filteredMembers
 }

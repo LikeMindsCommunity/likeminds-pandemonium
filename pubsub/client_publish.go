@@ -81,6 +81,10 @@ func updateSentReport(c *gin.Context, topic string, response *Response) {
 	}
 }
 
+type PublishDeliveredRequest struct {
+	ReceiverUUID []string `json:"receiver_uuids"`
+}
+
 func updateDeliveredReportOnPublish(c *gin.Context, topic string) {
 	// Get the community_id from the query parameters
 	chatroomID := c.Param("chatroom_id")
@@ -96,7 +100,7 @@ func updateDeliveredReportOnPublish(c *gin.Context, topic string) {
 	}
 
 	// Get the list of receiver_uuids from the request body
-	var deliveredRequest DeliveredRequest
+	var deliveredRequest PublishDeliveredRequest
 	rawData, _ := c.GetRawData()
 	if err := json.Unmarshal(rawData, &deliveredRequest); err != nil {
 		log.Printf(common.ErrorUnmarshalErrorJson, err)

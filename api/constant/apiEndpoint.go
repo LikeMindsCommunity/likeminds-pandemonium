@@ -5,9 +5,10 @@ const (
 )
 
 const (
-	RedisPublish   = "/publish/:topic"
-	RedisSubscribe = "/subscribe/:topic"
-	DeliveryReport = "/deliver_report"
+	RedisPublish            = "/publish/:topic"
+	RedisSubscribe          = "/subscribe/:topic"
+	CommunityDeliveryReport = "/community_delivery_report"
+	ChatroomDeliveryReport  = "/chatroom_delivery_report"
 )
 
 const (
