@@ -80,7 +80,7 @@ func updateSentDR(c *gin.Context, topic string, psResponse *PSResponse) {
 }
 
 type PublishDeliveredDR struct {
-	ReceiverUUID []string `json:"receiver_uuids"`
+	SenderUUIDs []string `json:"sender_uuids"`
 }
 
 func updateDeliveredDROnPublish(c *gin.Context, topic string) {
@@ -90,24 +90,32 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
 		return
 	}
-	senderUUID := c.GetHeader(constant.HeadersMemberID)
-	deviceID := c.GetHeader(constant.HeadersDeviceID)
-	if senderUUID == "" || senderUUID == "null" {
+	receiverUUID := c.GetHeader(constant.HeadersMemberID)
+	if receiverUUID == "" || receiverUUID == "null" {
 		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
 		return
 	}
-
+	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	// Get the list of receiver_uuids from the request body
 	var deliveredDR PublishDeliveredDR
 	rawData, _ := c.GetRawData()
 	if err := json.Unmarshal(rawData, &deliveredDR); err != nil {
 		log.Printf(common.ErrorUnmarshalErrorJson, err)
 	}
+
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
-	for _, receiverUUID := range deliveredDR.ReceiverUUID {
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
+
+	senderUUIDs := deliveredDR.SenderUUIDs
+	if senderUUIDs == nil || len(senderUUIDs) == 0 {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, "", receiverUUID); err != nil {
 			log.Println(err)
+		}
+	} else {
+		for _, senderUUID := range senderUUIDs {
+			if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }
