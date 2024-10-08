@@ -20,8 +20,8 @@ type DeliveryReport struct {
 	UserUUID       interface{} `json:"user_uuid"`
 }
 
-// UpdateSentReport Function to update the cache and send payload for Sent Report
-func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response) error {
+// UpdateSentDR Function to update the cache and send payload for Sent DR
+func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response) error {
 	var conversationResponse models.ConversationResponse
 	if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
@@ -29,31 +29,31 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 
 	conversationID := conversationResponse.Conversation.ID
 	userUUID := conversationResponse.Conversation.Member.UUID
-	// Create a CommunityDeliveryReport struct instance
-	sentReport := DeliveryReport{
+	// Create a SentDR struct instance
+	sentDR := DeliveryReport{
 		Timestamp:      time.Now().UnixMilli(),
 		ConversationID: conversationID,
 		UserUUID:       userUUID,
 	}
-	// Marshal the payload into JSON bytes
-	sentReportBytes, err := json.Marshal(sentReport)
-	if err != nil {
-		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
-	}
-	sentReportResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentReport, string(sentReportBytes))
-	// Generate the cache key for the sent report
+	// Generate the cache key for the sent DR
 	communityID := conversationResponse.Conversation.CommunityID
-	cacheKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
+	cacheKey := fmt.Sprintf(common.SentDRPrefix, communityID)
 	// Use the generic SaveToCacheGeneric function to save the value to Redis
-	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDeliveryReportFieldPrefix, userUUID), sentReportResponse, 7*24*time.Hour); err != nil {
+	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDRFieldPrefix, userUUID), sentDR, 7*24*time.Hour); err != nil {
 		return err
 	}
 
 	// Send payload to the user who sent the conversation
 	client := wsServerParent.GetConnectionFromWsServer(topic, userUUID)
 	if client != nil {
-		// Send payload to the client using WebSocket
-		if err := client.SendPayloadToClientConnection(sentReportResponse); err != nil {
+		// Marshal the payload into JSON bytes
+		sentDRBytes, err := json.Marshal(sentDR)
+		if err != nil {
+			return fmt.Errorf(common.ErrorMarshalErrorJson, err)
+		}
+		sentDRResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentDR, string(sentDRBytes))
+		// Send sent DR to the client using WebSocket
+		if err := client.SendPayloadToClientConnection(sentDRResponse); err != nil {
 			return err
 		}
 	}
@@ -61,25 +61,18 @@ func UpdateSentReport(redisClient *redis.Client, wsServerParent *ws.WsServerPare
 	return nil
 }
 
-// UpdateDeliveredReport Function to update the cache and send payload for Delivered Report using ZSet
-func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, chatroomID interface{}, deviceID, senderUUID, receiverUUID string) error {
-	// Create a CommunityDeliveryReport struct instance with the current timestamp
-	deliveryReport := DeliveryReport{
+// UpdateDeliveredDR Function to update the cache and send payload for Delivered DR using ZSet
+func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, chatroomID interface{}, deviceID, senderUUID, receiverUUID string) error {
+	// Create a SentDR struct instance with the current timestamp
+	deliveredDR := DeliveryReport{
 		Timestamp: time.Now().UnixMilli(),
 		UserUUID:  receiverUUID,
 	}
-	// Marshal the CommunityDeliveryReport struct into JSON bytes
-	reportBytes, err := json.Marshal(deliveryReport)
-	if err != nil {
-		return fmt.Errorf(common.ErrorMarshalErrorJson, err)
-	}
 
-	// Create a response for the delivered report
-	reportResponse := NewResponse(deviceID, common.TopicMessageTypeDeliveredReport, string(reportBytes))
-	// Generate the cache key for the delivered report
-	cacheKey := fmt.Sprintf(common.ChatroomDeliveryReportPrefix, chatroomID)
+	// Generate the cache key for the delivered DR
+	cacheKey := fmt.Sprintf(common.DeliveredDRPrefix, chatroomID)
 	// Use the generic SaveToCacheGeneric function to save the value to Redis (ZSet equivalent)
-	err = SaveZSet(redisClient, cacheKey, float64(deliveryReport.Timestamp), receiverUUID, 7*24*time.Hour)
+	err := SaveZSet(redisClient, cacheKey, float64(deliveredDR.Timestamp), receiverUUID, 7*24*time.Hour)
 	if err != nil {
 		return err
 	}
@@ -87,8 +80,15 @@ func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServe
 	// Send payload to the conversation creator if the user is still active
 	client := wsServerParent.GetConnectionFromWsServer(topic, senderUUID)
 	if client != nil {
-		// Send the report response via WebSocket to the user who created the conversation
-		if err := client.SendPayloadToClientConnection(reportResponse); err != nil {
+		// Marshal the SentDR struct into JSON bytes
+		deliveredDRBytes, err := json.Marshal(deliveredDR)
+		if err != nil {
+			return fmt.Errorf(common.ErrorMarshalErrorJson, err)
+		}
+		// Create a response for the delivered DR
+		deliveredDRResponse := NewResponse(deviceID, common.TopicMessageTypeDeliveredDR, string(deliveredDRBytes))
+		// Send the delivered DR response via WebSocket to the user who created the conversation
+		if err := client.SendPayloadToClientConnection(deliveredDRResponse); err != nil {
 			return err
 		}
 	}
@@ -96,20 +96,20 @@ func UpdateDeliveredReport(redisClient *redis.Client, wsServerParent *ws.WsServe
 	return nil
 }
 
-type CommunityDeliveryReportRequest struct {
+type SentDRRequest struct {
 	CommunityID interface{} `json:"community_id"`
 }
 
-func CommunityDeliveryReport(c *gin.Context) {
+func SentDR(c *gin.Context) {
 	// Step 1: Parse the request body to get the chatroom_id, user_uuids, page, and page_size
-	var requestBody CommunityDeliveryReportRequest
-	if err := c.ShouldBindJSON(&requestBody); err != nil {
+	var sentDRRequest SentDRRequest
+	if err := c.ShouldBindJSON(&sentDRRequest); err != nil {
 		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
 		return
 	}
 
 	// Step 2: Get chatroom_id from body
-	communityID := requestBody.CommunityID
+	communityID := sentDRRequest.CommunityID
 	if communityID == "" || communityID == "null" {
 		api.GeneralBadRequestError(c, common.ErrorCommunityIDMissing)
 		return
@@ -122,68 +122,60 @@ func CommunityDeliveryReport(c *gin.Context) {
 		return
 	}
 
-	// Create Redis key for delivery report
-	communityDRKey := fmt.Sprintf(common.CommunityDeliveryReportPrefix, communityID)
-	userDRField := fmt.Sprintf(common.UserDeliveryReportFieldPrefix, memberID)
+	// Create Redis key for delivered DR
+	sentDRKey := fmt.Sprintf(common.SentDRPrefix, communityID)
+	userDRField := fmt.Sprintf(common.UserDRFieldPrefix, memberID)
 
 	// Get Redis client from context
 	redisClient := GetRedisClientFromContext(c)
 
-	// Fetch the delivery report from Redis using HGET
-	drCacheValue, err := FetchFieldFromHashSet(redisClient, communityDRKey, userDRField)
+	// Fetch the delivered DR from Redis using HGET
+	sentDRCacheValue, err := FetchFieldFromHashSet(redisClient, sentDRKey, userDRField)
 	if err != nil {
 		api.GeneralStatusNotFoundError(c, fmt.Sprintf(common.ErrorFailedCacheFetchRedis, err))
 		return
 	}
-
-	if drCacheValue == "" {
-		api.GeneralStatusNotFoundError(c, common.ErrorNoDeliveryReportFound)
+	if sentDRCacheValue == "" {
+		api.GeneralStatusNotFoundError(c, common.ErrorNoDRFound)
 		return
 	}
 
-	// Unmarshal the drCacheValue into the drResponse structure
-	var drResponse Response
-	err = json.Unmarshal([]byte(drCacheValue), &drResponse)
+	// Unmarshal the sentDRCacheValue into the sentDRResponse structure
+	var sentDRResponse Response
+	err = json.Unmarshal([]byte(sentDRCacheValue), &sentDRResponse)
 	if err != nil {
 		api.GeneralAPIError(c, fmt.Sprintf(common.ErrorUnmarshalErrorJson, err))
 		return
 	}
 
-	api.GenerateResponse(c, drResponse)
+	api.GenerateResponse(c, sentDRResponse)
 }
 
-type ChatroomDeliveryReportRequest struct {
+type DeliveredDRRequest struct {
 	ChatroomID interface{} `json:"chatroom_id"`
 	UserUUIDs  []string    `json:"user_uuids"`
 	Page       int         `json:"page"`
 	PageSize   int         `json:"page_size"`
 }
 
-type ChatroomDeliveryReportResponse struct {
-	Reports  []map[string]interface{} `json:"reports"`
-	Page     int                      `json:"page"`
-	PageSize int                      `json:"page_size"`
-	Total    int                      `json:"total"`
-}
-
-func ChatroomDeliveryReport(c *gin.Context) {
+func DeliveredDR(c *gin.Context) {
 	// Step 1: Parse the request body to get the chatroom_id, user_uuids, page, and page_size
-	var requestBody ChatroomDeliveryReportRequest
-	if err := c.ShouldBindJSON(&requestBody); err != nil {
+	var deliveredDRRequest DeliveredDRRequest
+	if err := c.ShouldBindJSON(&deliveredDRRequest); err != nil {
 		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
 		return
 	}
 
 	// Step 2: Get chatroom_id from body
-	chatroomID := requestBody.ChatroomID
+	chatroomID := deliveredDRRequest.ChatroomID
 	if chatroomID == "" || chatroomID == "null" {
 		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
 		return
 	}
 
 	// Step 3: Set default values for page and page size
-	page := requestBody.Page
-	pageSize := requestBody.PageSize
+	page := deliveredDRRequest.Page
+	pageSize := deliveredDRRequest.PageSize
 	if page == 0 {
 		page = 1
 	}
@@ -191,13 +183,13 @@ func ChatroomDeliveryReport(c *gin.Context) {
 		pageSize = 10
 	}
 
-	// Step 4: Construct the Redis key for the chatroom delivery report
-	redisKey := fmt.Sprintf(common.ChatroomDeliveryReportPrefix, chatroomID)
+	// Step 4: Construct the Redis key for the chatroom delivered DR
+	redisKey := fmt.Sprintf(common.DeliveredDRPrefix, chatroomID)
 
 	// Step 5: Get Redis client from context
 	redisClient := GetRedisClientFromContext(c)
 
-	// Step 6: Fetch all members from the ZSet (chatroom delivery reports)
+	// Step 6: Fetch all members from the ZSet (delivered DR)
 	// We use the FetchMembersFromZSet helper function to get members within the time range
 	allMembers, err := FetchMembersFromZSet(redisClient, redisKey, 0, float64(time.Now().UnixMilli()))
 	if err != nil {
@@ -207,8 +199,8 @@ func ChatroomDeliveryReport(c *gin.Context) {
 
 	// Step 7: Filter members if user_uuids were provided in the request body
 	var filteredMembers []redis.Z
-	if len(requestBody.UserUUIDs) > 0 {
-		filteredMembers = filterMembersByUUIDs(allMembers, requestBody.UserUUIDs)
+	if len(deliveredDRRequest.UserUUIDs) > 0 {
+		filteredMembers = filterMembersByUUIDs(allMembers, deliveredDRRequest.UserUUIDs)
 	} else {
 		filteredMembers = allMembers
 	}
@@ -221,25 +213,23 @@ func ChatroomDeliveryReport(c *gin.Context) {
 	}
 	paginatedMembers := filteredMembers[startIndex:endIndex]
 
-	// Step 9: Prepare the response data
-	var reports []map[string]interface{}
+	// Step 9: Prepare the deliveredDRResponse data as a map of user_uuid: timestamp
+	deliveredDRMap := make(map[string]map[string]interface{})
 	for _, member := range paginatedMembers {
-		reports = append(reports, map[string]interface{}{
+		deliveredDRMap[member.Member.(string)] = map[string]interface{}{
 			"timestamp": member.Score,
-			"user_uuid": member.Member,
-		})
+		}
 	}
 
-	// Step 10: Return the paginated result
-	response := ChatroomDeliveryReportResponse{
-		Reports:  reports,
-		Page:     page,
-		PageSize: pageSize,
-		Total:    len(filteredMembers), // Total is the size of the filtered members
+	// Step 10: Return the paginated result as a JSON array
+	deliveredDRResponse := map[string]interface{}{
+		"delivered_dr": deliveredDRMap,
+		"page":         page,
+		"page_size":    pageSize,
+		"total":        len(filteredMembers), // Total is the size of the filtered members
 	}
-
-	// Step 11: Send the response back
-	c.JSON(200, response)
+	// Step 11: Send the deliveredDRResponse back
+	api.GenerateResponse(c, deliveredDRResponse)
 }
 
 // Helper function to filter members by provided user UUIDs

@@ -242,7 +242,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 					return
 				}
 				log.Println(common.ReceivedMessageRedisWs)
-				updateDeliveredReportOnSubscribe(redisClient, wsServerParent, topic, &response, client.UUID)
+				updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, &response, client.UUID)
 			}
 		}
 	}
@@ -277,7 +277,7 @@ func updateWriteDeadline(conn *websocket.Conn) {
 	}
 }
 
-func updateDeliveredReportOnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response, receiverUUID string) {
+func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response, receiverUUID string) {
 	// Unmarshal the response raw data into the ConversationResponse struct
 	var conversationResponse models.ConversationResponse
 	if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
@@ -287,7 +287,7 @@ func updateDeliveredReportOnSubscribe(redisClient *redis.Client, wsServerParent 
 	chatroomID := conversationResponse.Conversation.ChatroomID
 	deviceID := response.DeviceID
 	senderUUID := conversationResponse.Conversation.Member.UUID
-	if err := UpdateDeliveredReport(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
+	if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
 		log.Println(err)
 	}
 }

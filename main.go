@@ -32,8 +32,8 @@ func main() {
 	// Publish
 	router.POST(constant.RedisPublish, pubsub.Publish)
 	// Delivery Report
-	router.GET(constant.CommunityDeliveryReport, pubsub.CommunityDeliveryReport)
-	router.GET(constant.ChatroomDeliveryReport, pubsub.ChatroomDeliveryReport)
+	router.GET(constant.SentDR, pubsub.SentDR)
+	router.GET(constant.DeliveredDR, pubsub.DeliveredDR)
 
 	// start server
 	log.Fatal(router.Run(common.GoDotEnvVariable("Ws_SERVER_PORT")))

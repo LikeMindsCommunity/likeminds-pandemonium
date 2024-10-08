@@ -3,26 +3,26 @@ package common
 import "time"
 
 const (
-	RedisClient                   = "redis_client"
-	ReadBufferSizeDefault         = 4096
-	WriteBufferSizeDefault        = 4096
-	ParamTopic                    = "topic"
-	ParamTopicMessageType         = "topic_message_type"
-	TopicTypeChatroom             = "chatroom"
-	TopicTypeCommunity            = "community"
-	TopicMessageTypeConversation  = "conversation"
-	TopicMessageTypeSentReport    = "sent_report"
-	CommunityDeliveryReportPrefix = "community_%v_delivery_report"
+	RedisClient                  = "redis_client"
+	ReadBufferSizeDefault        = 4096
+	WriteBufferSizeDefault       = 4096
+	ParamTopic                   = "topic"
+	ParamTopicMessageType        = "topic_message_type"
+	TopicTypeChatroom            = "chatroom"
+	TopicTypeCommunity           = "community"
+	TopicMessageTypeConversation = "conversation"
+	TopicMessageTypeSentDR       = "sent_dr"
+	SentDRPrefix                 = "sent_dr_%v"
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer
 	PongWait = 60 * time.Second
 	// PingPeriod should be less than PongWait
-	PingPeriod                      = (PongWait * 9) / 10
-	WsServerKey                     = "ws_server"
-	UserDeliveryReportFieldPrefix   = "user_%v"
-	TopicMessageTypeDeliveredReport = "delivered_report"
-	ChatroomDeliveryReportPrefix    = "chatroom_%v_delivery_report"
+	PingPeriod                  = (PongWait * 9) / 10
+	WsServerKey                 = "ws_server"
+	UserDRFieldPrefix           = "user_%v"
+	TopicMessageTypeDeliveredDR = "delivered_dr"
+	DeliveredDRPrefix           = "delivered_dr_%v"
 )
 
 const (
@@ -53,7 +53,7 @@ const (
 	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
 	ErrorMarshalErrorJson      = "marshal error: %v"
 	ErrorInvalidJSONFormat     = "invalid JSON format: %v"
-	ErrorNoDeliveryReportFound = "no delivery report found for this user"
+	ErrorNoDRFound             = "no delivery report found for this user"
 )
 
 const (

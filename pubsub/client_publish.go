@@ -35,19 +35,17 @@ func PublishWithMethod(c *gin.Context, method int) {
 			case common.TopicMessageTypeConversation:
 				response := publishRawDataOnTopic(c, topic, topicMessageType)
 				if response != nil {
-					updateSentReport(c, topic, response)
+					updateSentDR(c, topic, response)
 				}
-			case common.TopicMessageTypeDeliveredReport:
-				// Handle the delivered_report case
-				updateDeliveredReportOnPublish(c, topic)
+			case common.TopicMessageTypeDeliveredDR:
+				updateDeliveredDROnPublish(c, topic)
 			}
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				_ = publishRawDataOnTopic(c, topic, topicMessageType)
-			case common.TopicMessageTypeDeliveredReport:
-				// Handle the delivered_report case
-				updateDeliveredReportOnPublish(c, topic)
+			case common.TopicMessageTypeDeliveredDR:
+				updateDeliveredDROnPublish(c, topic)
 			}
 		}
 	}
@@ -72,20 +70,20 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	return response
 }
 
-func updateSentReport(c *gin.Context, topic string, response *Response) {
+func updateSentDR(c *gin.Context, topic string, response *Response) {
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	if err := UpdateSentReport(redisClient, wsServerParent, topic, response); err != nil {
+	if err := UpdateSentDR(redisClient, wsServerParent, topic, response); err != nil {
 		log.Println(err)
 	}
 }
 
-type PublishDeliveredRequest struct {
+type PublishDeliveredDR struct {
 	ReceiverUUID []string `json:"receiver_uuids"`
 }
 
-func updateDeliveredReportOnPublish(c *gin.Context, topic string) {
+func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 	// Get the community_id from the query parameters
 	chatroomID := c.Param("chatroom_id")
 	if chatroomID == "" || chatroomID == "null" {
@@ -100,15 +98,15 @@ func updateDeliveredReportOnPublish(c *gin.Context, topic string) {
 	}
 
 	// Get the list of receiver_uuids from the request body
-	var deliveredRequest PublishDeliveredRequest
+	var deliveredDR PublishDeliveredDR
 	rawData, _ := c.GetRawData()
-	if err := json.Unmarshal(rawData, &deliveredRequest); err != nil {
+	if err := json.Unmarshal(rawData, &deliveredDR); err != nil {
 		log.Printf(common.ErrorUnmarshalErrorJson, err)
 	}
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
-	for _, receiverUUID := range deliveredRequest.ReceiverUUID {
-		if err := UpdateDeliveredReport(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
+	for _, receiverUUID := range deliveredDR.ReceiverUUID {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
 			log.Println(err)
 		}
 	}
