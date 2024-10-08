@@ -111,13 +111,3 @@ func FetchMembersFromZSet(redisClient *redis.Client, zsetKey string, minScore, m
 	}
 	return result, nil
 }
-
-// FetchZSetSize Function to fetch the number of members in a Redis ZSet
-func FetchZSetSize(redisClient *redis.Client, zsetKey string) (int64, error) {
-	// Use ZCard to get the number of members in the ZSet
-	size, err := redisClient.ZCard(ctx, zsetKey).Result()
-	if err != nil {
-		return 0, fmt.Errorf(common.ErrorFailedCacheFetchRedis, err)
-	}
-	return size, nil
-}
