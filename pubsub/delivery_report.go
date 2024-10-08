@@ -21,9 +21,9 @@ type DeliveryReport struct {
 }
 
 // UpdateSentDR Function to update the cache and send payload for Sent DR
-func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response) error {
+func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, deviceID, rawData string) error {
 	var conversationResponse models.ConversationResponse
-	if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
+	if err := json.Unmarshal([]byte(rawData), &conversationResponse); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
@@ -51,7 +51,7 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		if err != nil {
 			return fmt.Errorf(common.ErrorMarshalErrorJson, err)
 		}
-		sentDRResponse := NewResponse(response.DeviceID, common.TopicMessageTypeSentDR, string(sentDRBytes))
+		sentDRResponse := NewResponse(deviceID, common.TopicMessageTypeSentDR, string(sentDRBytes))
 		// Send sent DR to the client using WebSocket
 		if err := client.SendPayloadToClientConnection(sentDRResponse); err != nil {
 			return err
@@ -141,7 +141,7 @@ func SentDR(c *gin.Context) {
 	}
 
 	// Unmarshal the sentDRCacheValue into the sentDRResponse structure
-	var sentDRResponse Response
+	var sentDRResponse DeliveryReport
 	err = json.Unmarshal([]byte(sentDRCacheValue), &sentDRResponse)
 	if err != nil {
 		api.GeneralAPIError(c, fmt.Sprintf(common.ErrorUnmarshalErrorJson, err))

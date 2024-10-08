@@ -51,11 +51,11 @@ func PublishWithMethod(c *gin.Context, method int) {
 	}
 }
 
-func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) *Response {
+func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) *PSResponse {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	rawData, _ := c.GetRawData()
-	response := NewResponse(deviceID, topicMessageType, string(rawData))
-	responseBytes, err := json.Marshal(response)
+	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
+	responseBytes, err := json.Marshal(psResponse)
 	if err != nil {
 		return nil
 	}
@@ -67,14 +67,14 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 		return nil
 	}
 	api.GenerateResponse(c, nil)
-	return response
+	return psResponse
 }
 
-func updateSentDR(c *gin.Context, topic string, response *Response) {
+func updateSentDR(c *gin.Context, topic string, psResponse *PSResponse) {
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	if err := UpdateSentDR(redisClient, wsServerParent, topic, response); err != nil {
+	if err := UpdateSentDR(redisClient, wsServerParent, topic, psResponse.DeviceID, psResponse.RawData); err != nil {
 		log.Println(err)
 	}
 }

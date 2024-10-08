@@ -201,23 +201,23 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 				}
 				return
 			}
-			// Unmarshal messagePayloadByte Response
+			// Unmarshal messagePayloadByte PSResponse
 			messagePayloadByte := []byte(message.Payload)
-			var response Response
-			if err := json.Unmarshal(messagePayloadByte, &response); err != nil {
+			var psResponse PSResponse
+			if err := json.Unmarshal(messagePayloadByte, &psResponse); err != nil {
 				log.Printf(common.ErrorUnmarshalErrorJson, err)
 				return
 			}
-			switch response.TopicMessageType {
+			switch psResponse.TopicMessageType {
 			case common.TopicMessageTypeConversation:
 				var conversationResponse models.ConversationResponse
-				if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
+				if err := json.Unmarshal([]byte(psResponse.RawData), &conversationResponse); err != nil {
 					log.Printf(common.ErrorUnmarshalErrorJson, err)
 					return
 				}
 				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
 				if (conversationResponse.Conversation.Member.UUID == client.UUID) &&
-					(client.DeviceID != "" && client.DeviceID == response.DeviceID) {
+					(client.DeviceID != "" && client.DeviceID == psResponse.DeviceID) {
 					continue
 				}
 				participants := conversationResponse.Participants
@@ -242,7 +242,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 					return
 				}
 				log.Println(common.ReceivedMessageRedisWs)
-				updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, &response, client.UUID)
+				updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, psResponse.DeviceID, &conversationResponse, client.UUID)
 			}
 		}
 	}
@@ -277,15 +277,12 @@ func updateWriteDeadline(conn *websocket.Conn) {
 	}
 }
 
-func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, response *Response, receiverUUID string) {
-	// Unmarshal the response raw data into the ConversationResponse struct
-	var conversationResponse models.ConversationResponse
-	if err := json.Unmarshal([]byte(response.RawData), &conversationResponse); err != nil {
-		log.Println(fmt.Errorf(common.ErrorUnmarshalErrorJson, err))
+func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic, deviceID string, conversationResponse *models.ConversationResponse, receiverUUID string) {
+	if conversationResponse == nil {
+		return
 	}
 	// Extract communityID and chatroomID
 	chatroomID := conversationResponse.Conversation.ChatroomID
-	deviceID := response.DeviceID
 	senderUUID := conversationResponse.Conversation.Member.UUID
 	if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
 		log.Println(err)
