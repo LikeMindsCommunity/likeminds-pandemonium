@@ -197,7 +197,13 @@ func DeliveredDR(c *gin.Context) {
 		return
 	}
 
-	// Step 7: Filter members if user_uuids were provided in the request body
+	// Step 7: Get the member with the least timestamp (first member in the ZSet, which is allMembers[0])
+	var leastMember *redis.Z = nil
+	if len(allMembers) > 0 {
+		leastMember = &allMembers[0] // The first member in the ZSet has the least timestamp
+	}
+
+	// Step 8: Filter members if user_uuids were provided in the request body
 	var filteredMembers []redis.Z
 	if len(deliveredDRRequest.UserUUIDs) > 0 {
 		filteredMembers = filterMembersByUUIDs(allMembers, deliveredDRRequest.UserUUIDs)
@@ -205,7 +211,7 @@ func DeliveredDR(c *gin.Context) {
 		filteredMembers = allMembers
 	}
 
-	// Step 8: Apply pagination to the filtered members
+	// Step 9: Apply pagination to the filtered members
 	startIndex := (page - 1) * pageSize
 	endIndex := startIndex + pageSize
 	if endIndex > len(filteredMembers) {
@@ -213,7 +219,7 @@ func DeliveredDR(c *gin.Context) {
 	}
 	paginatedMembers := filteredMembers[startIndex:endIndex]
 
-	// Step 9: Prepare the deliveredDRResponse data as a map of user_uuid: timestamp
+	// Step 10: Prepare the deliveredDRResponse data as a map of user_uuid: timestamp
 	deliveredDRMap := make(map[string]map[string]interface{})
 	for _, member := range paginatedMembers {
 		deliveredDRMap[member.Member.(string)] = map[string]interface{}{
@@ -221,14 +227,23 @@ func DeliveredDR(c *gin.Context) {
 		}
 	}
 
-	// Step 10: Return the paginated result as a JSON array
+	// Step 11: Return the paginated result as a JSON array
 	deliveredDRResponse := map[string]interface{}{
 		"delivered_dr": deliveredDRMap,
 		"page":         page,
 		"page_size":    pageSize,
-		"total":        len(filteredMembers), // Total is the size of the filtered members
+		"total":        len(filteredMembers),
 	}
-	// Step 11: Send the deliveredDRResponse back
+	// Step 12: Prepare the least_delivered_dr data (if applicable)
+	if leastMember != nil {
+		leastMemberMap := make(map[string]map[string]interface{})
+		leastMemberMap[leastMember.Member.(string)] = map[string]interface{}{
+			"timestamp": leastMember.Score,
+		}
+		deliveredDRResponse["least_delivered_dr"] = leastMemberMap
+	}
+
+	// Step 13: Send the deliveredDRResponse back
 	api.GenerateResponse(c, deliveredDRResponse)
 }
 
