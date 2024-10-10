@@ -10,4 +10,5 @@ type Conversation struct {
 	ChatroomID  interface{} `json:"chatroom_id"`
 	CommunityID interface{} `json:"community_id"`
 	Member      Member      `json:"member"`
+	CreatedAt   int64       `json:"created_epoch"`
 }

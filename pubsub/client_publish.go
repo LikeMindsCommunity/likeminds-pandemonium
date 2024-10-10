@@ -33,17 +33,16 @@ func PublishWithMethod(c *gin.Context, method int) {
 		case common.TopicTypeChatroom:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
-				response := publishRawDataOnTopic(c, topic, topicMessageType)
-				if response != nil {
-					updateSentDR(c, topic, response)
-				}
+				publishRawDataOnTopic(c, topic, topicMessageType)
+				updateSentDR(c, topic)
+
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
 			}
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
-				_ = publishRawDataOnTopic(c, topic, topicMessageType)
+				publishRawDataOnTopic(c, topic, topicMessageType)
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
 			}
@@ -51,30 +50,32 @@ func PublishWithMethod(c *gin.Context, method int) {
 	}
 }
 
-func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) *PSResponse {
+func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	rawData, _ := c.GetRawData()
 	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
 	responseBytes, err := json.Marshal(psResponse)
 	if err != nil {
-		return nil
+		return
 	}
 
 	redisClient := GetRedisClientFromContext(c)
 	// publish rawData to pubsub channel:<chatroomID>
 	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
 		api.GeneralAPIError(c, err.Error())
-		return nil
+		return
 	}
 	api.GenerateResponse(c, nil)
-	return psResponse
 }
 
-func updateSentDR(c *gin.Context, topic string, psResponse *PSResponse) {
+func updateSentDR(c *gin.Context, topic string) {
+	deviceID := c.GetHeader(constant.HeadersDeviceID)
+	rawData, _ := c.GetRawData()
+
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	if err := UpdateSentDR(redisClient, wsServerParent, topic, psResponse.DeviceID, psResponse.RawData); err != nil {
+	if err := UpdateSentDR(redisClient, wsServerParent, topic, deviceID, rawData); err != nil {
 		log.Println(err)
 	}
 }

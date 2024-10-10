@@ -20,40 +20,41 @@ type DeliveryReport struct {
 	UserUUID       interface{} `json:"user_uuid"`
 }
 
-// UpdateSentDR Function to update the cache and send payload for Sent DR
-func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, deviceID, rawData string) error {
+func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic, deviceID string, rawData []byte) error {
 	var conversationResponse models.ConversationResponse
-	if err := json.Unmarshal([]byte(rawData), &conversationResponse); err != nil {
+	if err := json.Unmarshal(rawData, &conversationResponse); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
 	conversationID := conversationResponse.Conversation.ID
+	chatroomID := conversationResponse.Conversation.ChatroomID
 	userUUID := conversationResponse.Conversation.Member.UUID
-	// Create a SentDR struct instance
-	sentDR := DeliveryReport{
-		Timestamp:      time.Now().UnixMilli(),
-		ConversationID: conversationID,
-		UserUUID:       userUUID,
-	}
-	// Generate the cache key for the sent DR
-	communityID := conversationResponse.Conversation.CommunityID
-	cacheKey := fmt.Sprintf(common.SentDRPrefix, communityID)
-	// Use the generic SaveToCacheGeneric function to save the value to Redis
-	if err := SaveHashSet(redisClient, cacheKey, fmt.Sprintf(common.UserDRFieldPrefix, userUUID), sentDR, 7*24*time.Hour); err != nil {
+	participantsCount := len(conversationResponse.Participants)
+
+	// Create the cache keys
+	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
+	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
+
+	// Update the cache for chatroom and conversation
+	err := SaveZSet(redisClient, chatroomKey, float64(conversationResponse.Conversation.CreatedAt), conversationKey, 7*24*time.Hour)
+	if err != nil {
 		return err
 	}
 
-	// Send payload to the user who sent the conversation
+	sentDRValue := map[string]interface{}{
+		"delivery_count": participantsCount,
+		"sender_uuid":    userUUID,
+	}
+	err = SaveHashSet(redisClient, conversationKey, "", sentDRValue, 7*24*time.Hour)
+	if err != nil {
+		return err
+	}
+
+	// Send the payload to the conversation creator
 	client := wsServerParent.GetConnectionFromWsServer(topic, userUUID)
 	if client != nil {
-		// Marshal the payload into JSON bytes
-		sentDRBytes, err := json.Marshal(sentDR)
-		if err != nil {
-			return fmt.Errorf(common.ErrorMarshalErrorJson, err)
-		}
-		sentDRResponse := NewResponse(deviceID, common.TopicMessageTypeSentDR, string(sentDRBytes))
-		// Send sent DR to the client using WebSocket
-		if err := client.SendPayloadToClientConnection(sentDRResponse); err != nil {
+		payload := NewResponse(deviceID, common.TopicMessageTypeSentDR, string(rawData))
+		if err := client.SendPayloadToClientConnection(payload); err != nil {
 			return err
 		}
 	}

@@ -23,6 +23,8 @@ const (
 	UserDRFieldPrefix           = "user_%v"
 	TopicMessageTypeDeliveredDR = "delivered_dr"
 	DeliveredDRPrefix           = "delivered_dr_%v"
+	DRChatroomPrefix            = "dr_chatroom_%v"
+	DRConversationPrefix        = "dr_conversation_%v"
 )
 
 const (
