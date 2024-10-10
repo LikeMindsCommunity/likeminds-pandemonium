@@ -11,8 +11,6 @@ const (
 	TopicTypeChatroom            = "chatroom"
 	TopicTypeCommunity           = "community"
 	TopicMessageTypeConversation = "conversation"
-	TopicMessageTypeSentDR       = "sent_dr"
-	SentDRPrefix                 = "sent_dr_%v"
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer
@@ -20,11 +18,13 @@ const (
 	// PingPeriod should be less than PongWait
 	PingPeriod                  = (PongWait * 9) / 10
 	WsServerKey                 = "ws_server"
-	UserDRFieldPrefix           = "user_%v"
+	TopicMessageTypeSentDR      = "sent_dr"
 	TopicMessageTypeDeliveredDR = "delivered_dr"
-	DeliveredDRPrefix           = "delivered_dr_%v"
 	DRChatroomPrefix            = "dr_chatroom_%v"
 	DRConversationPrefix        = "dr_conversation_%v"
+	DRConversationMetaPrefix    = "dr_conversation_meta"
+	DRUserPrefix                = "dr_user_%v"
+	TopicTypeChatroomDynamic    = "chatroom:%s"
 )
 
 const (
@@ -55,7 +55,10 @@ const (
 	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
 	ErrorMarshalErrorJson      = "marshal error: %v"
 	ErrorInvalidJSONFormat     = "invalid JSON format: %v"
-	ErrorNoDRFound             = "no delivery report found for this user"
+	ErrorFailedToFetchField    = "failed to fetch field %s from key %s: %w"
+	ErrorFailedToSetFields     = "failed to set fields for key %s: %w"
+	ErrorMissingTimestamp      = "min_timestamp and max_timestamp are required"
+	ErrorInvalidTimestamp      = "invalid timestamp format"
 )
 
 const (
@@ -65,4 +68,5 @@ const (
 	ErrorTopicMessageTypeMissing = "topic message type is missing from params"
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
+	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
 )

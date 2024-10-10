@@ -242,7 +242,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 					return
 				}
 				log.Println(common.ReceivedMessageRedisWs)
-				updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, psResponse.DeviceID, &conversationResponse, client.UUID)
+				updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, client.DeviceID, &conversationResponse, client.UUID)
 			}
 		}
 	}
@@ -277,14 +277,18 @@ func updateWriteDeadline(conn *websocket.Conn) {
 	}
 }
 
-func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic, deviceID string, conversationResponse *models.ConversationResponse, receiverUUID string) {
+func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic, deliveredDeviceID string, conversationResponse *models.ConversationResponse, deliveredUUID string) {
+	//todo defensive check on topic?
 	if conversationResponse == nil {
 		return
 	}
-	// Extract communityID and chatroomID
-	chatroomID := conversationResponse.Conversation.ChatroomID
+	// Extract chatroomID and senderUUID from the conversation.
 	senderUUID := conversationResponse.Conversation.Member.UUID
-	if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, chatroomID, deviceID, senderUUID, receiverUUID); err != nil {
+	conversationID := conversationResponse.Conversation.ID
+	chatroomID := conversationResponse.Conversation.ChatroomID
+
+	// Update the delivered report using the common function.
+	if err := UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
 		log.Println(err)
 	}
 }

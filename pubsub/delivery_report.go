@@ -10,6 +10,8 @@ import (
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
+	"log"
+	"strings"
 	"time"
 )
 
@@ -45,7 +47,7 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		"delivery_count": participantsCount,
 		"sender_uuid":    userUUID,
 	}
-	err = SaveHashSet(redisClient, conversationKey, "", sentDRValue, 7*24*time.Hour)
+	err = SaveHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix, sentDRValue, 7*24*time.Hour)
 	if err != nil {
 		return err
 	}
@@ -62,34 +64,58 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	return nil
 }
 
-// UpdateDeliveredDR Function to update the cache and send payload for Delivered DR using ZSet
-func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic string, chatroomID interface{}, deviceID, senderUUID, receiverUUID string) error {
-	// Create a SentDR struct instance with the current timestamp
-	deliveredDR := DeliveryReport{
-		Timestamp: time.Now().UnixMilli(),
-		UserUUID:  receiverUUID,
+// UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
+func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, senderUUID, deliveredUUID string) error {
+	// If the message sender is same as message delivered user, no need to update
+	if senderUUID == deliveredUUID {
+		return nil
 	}
 
-	// Generate the cache key for the delivered DR
-	cacheKey := fmt.Sprintf(common.DeliveredDRPrefix, chatroomID)
-	// Use the generic SaveToCacheGeneric function to save the value to Redis (ZSet equivalent)
-	err := SaveZSet(redisClient, cacheKey, float64(deliveredDR.Timestamp), receiverUUID, 7*24*time.Hour)
+	// Fetch and update the dr_conversation_<conversation_id>
+	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
+
+	// Construct the field for the delivered report using the new key format.
+	deliveredUUIDField := fmt.Sprintf(common.DRUserPrefix, deliveredUUID)
+
+	// Check if the delivered report for this user already exists.
+	existingDeliveredReport, err := FetchFieldFromHashSet(redisClient, conversationKey, deliveredUUIDField)
 	if err != nil {
 		return err
 	}
 
-	// Send payload to the conversation creator if the user is still active
-	client := wsServerParent.GetConnectionFromWsServer(topic, senderUUID)
+	// If the delivered report already exists, no need to update.
+	if existingDeliveredReport != "" {
+		return nil
+	}
+
+	// Set the current timestamp as the delivered timestamp.
+	currentTimestamp := time.Now().UnixMilli()
+	// Update the Redis key with the new delivered report.
+	err = SaveHashSet(redisClient, conversationKey, deliveredUUIDField, currentTimestamp, 7*24*time.Hour)
+	if err != nil {
+		return err
+	}
+
+	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
+	// Send the updated delivered report to the conversation creator's connection.
+	client := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
 	if client != nil {
-		// Marshal the SentDR struct into JSON bytes
-		deliveredDRBytes, err := json.Marshal(deliveredDR)
-		if err != nil {
-			return fmt.Errorf(common.ErrorMarshalErrorJson, err)
+		// Create the payload for the delivered report.
+		deliveredReport := map[string]interface{}{
+			deliveredUUIDField: currentTimestamp,
 		}
-		// Create a response for the delivered DR
-		deliveredDRResponse := NewResponse(deviceID, common.TopicMessageTypeDeliveredDR, string(deliveredDRBytes))
-		// Send the delivered DR response via WebSocket to the user who created the conversation
-		if err := client.SendPayloadToClientConnection(deliveredDRResponse); err != nil {
+
+		// Marshal the updated delivered report for the response.
+		deliveredReportBytes, err := json.Marshal(deliveredReport)
+		if err != nil {
+			return err
+		}
+
+		// Create the response payload for the delivered report.
+		deliveredReportResponse := NewResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, string(deliveredReportBytes))
+
+		// Send the payload via WebSocket to the conversation creator.
+		if err := client.SendPayloadToClientConnection(deliveredReportResponse); err != nil {
 			return err
 		}
 	}
@@ -97,172 +123,102 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	return nil
 }
 
-type SentDRRequest struct {
-	CommunityID interface{} `json:"community_id"`
+// DeliveryReportRequest defines the structure of the request body for the /delivery_report API.
+type DeliveryReportRequest struct {
+	ChatroomID      string   `json:"chatroom_id" binding:"required"`
+	ConversationIDs []string `json:"conversation_ids" binding:"required"`
 }
 
-func SentDR(c *gin.Context) {
-	// Step 1: Parse the request body to get the chatroom_id, user_uuids, page, and page_size
-	var sentDRRequest SentDRRequest
-	if err := c.ShouldBindJSON(&sentDRRequest); err != nil {
-		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
-		return
-	}
+// DeliveryReportResponse defines the structure of the response for the /delivery_report API.
+type DeliveryReportResponse struct {
+	DeliveryReport map[string]map[string]interface{} `json:"delivery_report"`
+}
 
-	// Step 2: Get chatroom_id from body
-	communityID := sentDRRequest.CommunityID
-	if communityID == "" || communityID == "null" {
-		api.GeneralBadRequestError(c, common.ErrorCommunityIDMissing)
-		return
-	}
-
-	// Get x-member-id from headers
+// DeliveryReportHandler handles the request for the /delivery_report API.
+func DeliveryReportHandler(c *gin.Context) {
+	// Parse x-member-id from headers.
 	memberID := c.GetHeader(constant.HeadersMemberID)
 	if memberID == "" || memberID == "null" {
 		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
 		return
 	}
 
-	// Create Redis key for delivered DR
-	sentDRKey := fmt.Sprintf(common.SentDRPrefix, communityID)
-	userDRField := fmt.Sprintf(common.UserDRFieldPrefix, memberID)
-
-	// Get Redis client from context
-	redisClient := GetRedisClientFromContext(c)
-
-	// Fetch the delivered DR from Redis using HGET
-	sentDRCacheValue, err := FetchFieldFromHashSet(redisClient, sentDRKey, userDRField)
-	if err != nil {
-		api.GeneralStatusNotFoundError(c, fmt.Sprintf(common.ErrorFailedCacheFetchRedis, err))
-		return
-	}
-	if sentDRCacheValue == "" {
-		api.GeneralStatusNotFoundError(c, common.ErrorNoDRFound)
-		return
-	}
-
-	// Unmarshal the sentDRCacheValue into the sentDRResponse structure
-	var sentDRResponse DeliveryReport
-	err = json.Unmarshal([]byte(sentDRCacheValue), &sentDRResponse)
-	if err != nil {
-		api.GeneralAPIError(c, fmt.Sprintf(common.ErrorUnmarshalErrorJson, err))
-		return
-	}
-
-	api.GenerateResponse(c, sentDRResponse)
-}
-
-type DeliveredDRRequest struct {
-	ChatroomID interface{} `json:"chatroom_id"`
-	UserUUIDs  []string    `json:"user_uuids"`
-	Page       int         `json:"page"`
-	PageSize   int         `json:"page_size"`
-}
-
-func DeliveredDR(c *gin.Context) {
-	// Step 1: Parse the request body to get the chatroom_id, user_uuids, page, and page_size
-	var deliveredDRRequest DeliveredDRRequest
-	if err := c.ShouldBindJSON(&deliveredDRRequest); err != nil {
+	// Parse the request body to extract chatroom_id and conversation_ids.
+	var request DeliveryReportRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
 		return
 	}
 
-	// Step 2: Get chatroom_id from body
-	chatroomID := deliveredDRRequest.ChatroomID
-	if chatroomID == "" || chatroomID == "null" {
+	// Validate that chatroom_id and conversation_ids are present.
+	chatroomID := request.ChatroomID
+	if chatroomID == "" {
 		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
 		return
 	}
-
-	// Step 3: Set default values for page and page size
-	page := deliveredDRRequest.Page
-	pageSize := deliveredDRRequest.PageSize
-	if page == 0 {
-		page = 1
-	}
-	if pageSize == 0 {
-		pageSize = 10
+	conversationIDs := request.ConversationIDs
+	if len(conversationIDs) == 0 {
+		api.GeneralBadRequestError(c, common.ErrorConversationIDsMissing)
+		return
 	}
 
-	// Step 4: Construct the Redis key for the chatroom delivered DR
-	redisKey := fmt.Sprintf(common.DeliveredDRPrefix, chatroomID)
-
-	// Step 5: Get Redis client from context
+	// Get Redis client from context.
 	redisClient := GetRedisClientFromContext(c)
 
-	// Step 6: Fetch all members from the ZSet (delivered DR)
-	// We use the FetchMembersFromZSet helper function to get members within the time range
-	allMembers, err := FetchMembersFromZSet(redisClient, redisKey, 0, float64(time.Now().UnixMilli()))
+	// Fetch the conversation delivery report data for all provided conversation IDs.
+	conversationKeys := make([]string, len(conversationIDs))
+	for i, conversationID := range request.ConversationIDs {
+		conversationKeys[i] = fmt.Sprintf(common.DRConversationPrefix, conversationID)
+	}
+
+	// Perform a pipeline GET operation for all conversation keys to get the delivery reports.
+	pipe := redisClient.Pipeline()
+	cmds := make([]*redis.MapStringStringCmd, len(conversationKeys))
+	for i, conversationKey := range conversationKeys {
+		cmds[i] = pipe.HGetAll(c, conversationKey)
+	}
+	_, err := pipe.Exec(c)
 	if err != nil {
 		api.GeneralAPIError(c, err.Error())
 		return
 	}
 
-	// Step 7: Get the member with the least timestamp (first member in the ZSet, which is allMembers[0])
-	var leastMember *redis.Z = nil
-	if len(allMembers) > 0 {
-		leastMember = &allMembers[0] // The first member in the ZSet has the least timestamp
-	}
+	// Construct the response.
+	deliveryReport := make(map[string]map[string]interface{})
+	for i, cmd := range cmds {
+		conversationID := conversationIDs[i]
 
-	// Step 8: Filter members if user_uuids were provided in the request body
-	var filteredMembers []redis.Z
-	if len(deliveredDRRequest.UserUUIDs) > 0 {
-		filteredMembers = filterMembersByUUIDs(allMembers, deliveredDRRequest.UserUUIDs)
-	} else {
-		filteredMembers = allMembers
-	}
+		// Get the result of the HGETALL command.
+		data, err := cmd.Result()
+		if err != nil {
+			log.Printf("Error fetching data for conversation %s: %v", conversationID, err)
+			continue
+		}
 
-	// Step 9: Apply pagination to the filtered members
-	startIndex := (page - 1) * pageSize
-	endIndex := startIndex + pageSize
-	if endIndex > len(filteredMembers) {
-		endIndex = len(filteredMembers)
-	}
-	paginatedMembers := filteredMembers[startIndex:endIndex]
-
-	// Step 10: Prepare the deliveredDRResponse data as a map of user_uuid: timestamp
-	deliveredDRMap := make(map[string]map[string]interface{})
-	for _, member := range paginatedMembers {
-		deliveredDRMap[member.Member.(string)] = map[string]interface{}{
-			"timestamp": member.Score,
+		// Add the conversation data to the delivery report map directly.
+		deliveryReport[conversationID] = map[string]interface{}{
+			"delivery_count": data["delivery_count"],
+			"sender_uuid":    data["sender_uuid"],
+			"delivered_dr":   extractDeliveredDRFields(data),
 		}
 	}
 
-	// Step 11: Return the paginated result as a JSON array
-	deliveredDRResponse := map[string]interface{}{
-		"delivered_dr": deliveredDRMap,
-		"page":         page,
-		"page_size":    pageSize,
-		"total":        len(filteredMembers),
+	// Create and send the response.
+	response := DeliveryReportResponse{
+		DeliveryReport: deliveryReport,
 	}
-	// Step 12: Prepare the least_delivered_dr data (if applicable)
-	if leastMember != nil {
-		leastMemberMap := make(map[string]map[string]interface{})
-		leastMemberMap[leastMember.Member.(string)] = map[string]interface{}{
-			"timestamp": leastMember.Score,
-		}
-		deliveredDRResponse["least_delivered_dr"] = leastMemberMap
-	}
-
-	// Step 13: Send the deliveredDRResponse back
-	api.GenerateResponse(c, deliveredDRResponse)
+	api.GenerateResponse(c, response)
 }
 
-// Helper function to filter members by provided user UUIDs
-func filterMembersByUUIDs(members []redis.Z, userUUIDs []string) []redis.Z {
-	// Create a set of user UUIDs for faster lookup
-	uuidSet := make(map[string]bool)
-	for _, uuid := range userUUIDs {
-		uuidSet[uuid] = true
-	}
+// extractDeliveredDRFields extracts the delivered reports from the Redis data map.
+func extractDeliveredDRFields(data map[string]string) map[string]interface{} {
+	deliveredDR := make(map[string]interface{})
 
-	// Filter members based on user UUIDs
-	var filteredMembers []redis.Z
-	for _, member := range members {
-		if uuidSet[member.Member.(string)] {
-			filteredMembers = append(filteredMembers, member)
+	// Iterate through all fields in the Redis hash and find delivered report fields.
+	for key, value := range data {
+		if strings.HasPrefix(key, common.DRUserPrefix) {
+			deliveredDR[key] = value
 		}
 	}
-
-	return filteredMembers
+	return deliveredDR
 }
