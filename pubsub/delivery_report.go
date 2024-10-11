@@ -79,9 +79,6 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 
 	// Check if the delivered report for this user already exists.
 	existingDeliveredReport, err := FetchFieldFromHashSet(redisClient, conversationKey, deliveredUUIDField)
-	if err != nil {
-		return err
-	}
 
 	// If the delivered report already exists, no need to update.
 	if existingDeliveredReport != "" {
@@ -195,10 +192,24 @@ func DeliveryReportHandler(c *gin.Context) {
 			continue
 		}
 
+		// Extract the "dr_conversation_meta" field.
+		metaData, ok := data[common.DRConversationMetaPrefix]
+		if !ok || metaData == "" {
+			log.Printf("Missing or empty dr_conversation_meta for conversation %s", conversationID)
+			continue
+		}
+
+		// Unmarshal the metadata field.
+		var metaMap map[string]interface{}
+		if err := json.Unmarshal([]byte(metaData), &metaMap); err != nil {
+			log.Printf("Error unmarshalling conversation meta for %s: %v", conversationID, err)
+			continue
+		}
+
 		// Add the conversation data to the delivery report map directly.
 		deliveryReport[conversationID] = map[string]interface{}{
-			"delivery_count": data["delivery_count"],
-			"sender_uuid":    data["sender_uuid"],
+			"delivery_count": metaMap["delivery_count"],
+			"sender_uuid":    metaMap["sender_uuid"],
 			"delivered_dr":   extractDeliveredDRFields(data),
 		}
 	}
@@ -216,7 +227,7 @@ func extractDeliveredDRFields(data map[string]string) map[string]interface{} {
 
 	// Iterate through all fields in the Redis hash and find delivered report fields.
 	for key, value := range data {
-		if strings.HasPrefix(key, common.DRUserPrefix) {
+		if strings.HasPrefix(key, common.DRUser) {
 			deliveredDR[key] = value
 		}
 	}

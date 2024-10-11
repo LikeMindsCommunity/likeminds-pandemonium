@@ -23,8 +23,10 @@ const (
 	DRChatroomPrefix            = "dr_chatroom_%v"
 	DRConversationPrefix        = "dr_conversation_%v"
 	DRConversationMetaPrefix    = "dr_conversation_meta"
-	DRUserPrefix                = "dr_user_%v"
-	TopicTypeChatroomDynamic    = "chatroom:%s"
+	DRUserPrefix                = DRUser + "%v"
+	TopicTypeChatroomDynamic    = "chatroom:%v"
+	RawData                     = "raw_data"
+	DRUser                      = "dr_user_"
 )
 
 const (

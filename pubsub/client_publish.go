@@ -55,6 +55,8 @@ func PublishWithMethod(c *gin.Context, method int) {
 func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	rawData, _ := c.GetRawData()
+	//To reuse rawData
+	c.Set(common.RawData, rawData)
 	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
 	responseBytes, err := json.Marshal(psResponse)
 	if err != nil {
@@ -72,12 +74,13 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 
 func updateSentDR(c *gin.Context, topic string) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
-	rawData, _ := c.GetRawData()
+	//Reusing it from gin context
+	rawData, _ := c.Get(common.RawData)
 
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	if err := UpdateSentDR(redisClient, wsServerParent, topic, deviceID, rawData); err != nil {
+	if err := UpdateSentDR(redisClient, wsServerParent, topic, deviceID, rawData.([]byte)); err != nil {
 		log.Println(err)
 	}
 }
