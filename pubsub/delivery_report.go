@@ -31,7 +31,7 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	conversationID := conversationResponse.Conversation.ID
 	chatroomID := conversationResponse.Conversation.ChatroomID
 	userUUID := conversationResponse.Conversation.Member.UUID
-	participantsCount := len(conversationResponse.Participants)
+	participantsCount := conversationResponse.TotalParticipantsCount
 
 	// Create the cache keys
 	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
