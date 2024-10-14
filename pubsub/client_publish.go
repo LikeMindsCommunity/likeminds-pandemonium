@@ -9,7 +9,6 @@ import (
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/ws"
 	"log"
-	"strconv"
 )
 
 func Publish(c *gin.Context) {
@@ -111,19 +110,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
 		return
 	}
-
-	// Parse timestamps to float64 for Redis.
-	minTimestampString, err := strconv.ParseFloat(deliveredDR.MinTimestamp, 64)
-	if err != nil {
-		api.GeneralBadRequestError(c, common.ErrorInvalidTimestamp)
-		return
-	}
-	maxTimestampString, err := strconv.ParseFloat(deliveredDR.MaxTimestamp, 64)
-	if err != nil {
-		api.GeneralBadRequestError(c, common.ErrorInvalidTimestamp)
-		return
-	}
-
+	
 	// Construct the Redis key for the chatroom delivery report.
 	redisKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 
@@ -132,7 +119,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
 	// Step 1: Fetch all member values between min and max timestamps from the Redis key.
-	drConversations, err := FetchMembersFromZSet(redisClient, redisKey, minTimestampString, maxTimestampString)
+	drConversations, err := FetchMembersFromZSet(redisClient, redisKey, deliveredDR.MinTimestamp, deliveredDR.MaxTimestamp)
 	if err != nil {
 		api.GeneralAPIError(c, err.Error())
 		return

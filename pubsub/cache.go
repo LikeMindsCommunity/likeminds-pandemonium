@@ -100,11 +100,11 @@ func SaveZSet(redisClient *redis.Client, zsetKey string, score float64, member i
 }
 
 // FetchMembersFromZSet Function to fetch members from a Redis ZSet (sorted set) within a score range
-func FetchMembersFromZSet(redisClient *redis.Client, zsetKey string, minScore, maxScore float64) ([]redis.Z, error) {
+func FetchMembersFromZSet(redisClient *redis.Client, zsetKey string, minScore, maxScore string) ([]redis.Z, error) {
 	// Use ZRangeByScoreWithScores to fetch the members within the score range
 	result, err := redisClient.ZRangeByScoreWithScores(ctx, zsetKey, &redis.ZRangeBy{
-		Min: fmt.Sprintf("%f", minScore),
-		Max: fmt.Sprintf("%f", maxScore),
+		Min: minScore,
+		Max: maxScore,
 	}).Result()
 	if err != nil {
 		return nil, fmt.Errorf(common.ErrorFailedCacheFetchRedis, err)

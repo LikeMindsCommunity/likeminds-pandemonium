@@ -1,8 +1,9 @@
 package models
 
 type ConversationResponse struct {
-	Conversation Conversation `json:"conversation"`
-	Participants []string     `json:"participants"`
+	Conversation           Conversation `json:"conversation"`
+	Participants           []string     `json:"participants"`
+	TotalParticipantsCount int          `json:"total_participants_count"`
 }
 
 type Conversation struct {
