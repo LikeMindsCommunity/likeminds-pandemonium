@@ -242,7 +242,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 					return
 				}
 				log.Println(common.ReceivedMessageRedisWs)
-				updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, client.DeviceID, &conversationResponse, client.UUID)
+				go updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, client.DeviceID, &conversationResponse, client.UUID)
 			}
 		}
 	}
@@ -287,8 +287,7 @@ func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.
 	conversationID := conversationResponse.Conversation.ID
 	chatroomID := conversationResponse.Conversation.ChatroomID
 
-	// Update the delivered report using the common function.
-	if err := UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
+	if err := UpdateDeliveredDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
 		log.Println(err)
 	}
 }

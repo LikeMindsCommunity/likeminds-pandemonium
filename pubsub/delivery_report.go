@@ -64,15 +64,19 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	return nil
 }
 
+// UpdateDeliveredDRWithConversationID updates the delivered report in Redis and sends a payload to the conversation creator.
+func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, senderUUID, deliveredUUID string) error {
+	// Fetch and update the dr_conversation_<conversation_id>
+	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
+	return UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID)
+}
+
 // UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
-func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, senderUUID, deliveredUUID string) error {
+func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey string, deliveredDeviceID, senderUUID, deliveredUUID string) error {
 	// If the message sender is same as message delivered user, no need to update
 	if senderUUID == deliveredUUID {
 		return nil
 	}
-
-	// Fetch and update the dr_conversation_<conversation_id>
-	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
 
 	// Construct the field for the delivered report using the new key format.
 	deliveredUUIDField := fmt.Sprintf(common.DRUserPrefix, deliveredUUID)

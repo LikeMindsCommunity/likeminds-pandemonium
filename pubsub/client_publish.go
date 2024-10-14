@@ -9,6 +9,7 @@ import (
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/ws"
 	"log"
+	"strconv"
 )
 
 func Publish(c *gin.Context) {
@@ -35,7 +36,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
-				updateSentDR(c, topic)
+				go updateSentDR(c, topic)
 
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
@@ -44,8 +45,6 @@ func PublishWithMethod(c *gin.Context, method int) {
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
-			case common.TopicMessageTypeDeliveredDR:
-				updateDeliveredDROnPublish(c, topic)
 			}
 		}
 	}
@@ -85,8 +84,8 @@ func updateSentDR(c *gin.Context, topic string) {
 }
 
 type PublishDeliveredDR struct {
-	MinTimestamp int64 `json:"min_timestamp"`
-	MaxTimestamp int64 `json:"max_timestamp"`
+	MinTimestamp string `json:"min_timestamp"`
+	MaxTimestamp string `json:"max_timestamp"`
 }
 
 func updateDeliveredDROnPublish(c *gin.Context, topic string) {
@@ -109,7 +108,19 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 	// Get the min_timestamp and max_timestamp from the body.
 	var deliveredDR PublishDeliveredDR
 	if err := c.ShouldBindJSON(&deliveredDR); err != nil {
-		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
+		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
+		return
+	}
+
+	// Parse timestamps to float64 for Redis.
+	minTimestampString, err := strconv.ParseFloat(deliveredDR.MinTimestamp, 64)
+	if err != nil {
+		api.GeneralBadRequestError(c, common.ErrorInvalidTimestamp)
+		return
+	}
+	maxTimestampString, err := strconv.ParseFloat(deliveredDR.MaxTimestamp, 64)
+	if err != nil {
+		api.GeneralBadRequestError(c, common.ErrorInvalidTimestamp)
 		return
 	}
 
@@ -121,16 +132,16 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
 	// Step 1: Fetch all member values between min and max timestamps from the Redis key.
-	drConversations, err := FetchMembersFromZSet(redisClient, redisKey, float64(deliveredDR.MinTimestamp), float64(deliveredDR.MaxTimestamp))
+	drConversations, err := FetchMembersFromZSet(redisClient, redisKey, minTimestampString, maxTimestampString)
 	if err != nil {
 		api.GeneralAPIError(c, err.Error())
 		return
 	}
 
 	// Step 2: Iterate over each member value, which corresponds to conversation IDs.
-	for _, conversationID := range drConversations {
+	for _, drConversation := range drConversations {
 		// Construct the key for the conversation delivery report.
-		conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
+		conversationKey := fmt.Sprintf("%s", drConversation.Member)
 
 		// Fetch the conversation delivery report from Redis.
 		conversationData, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
@@ -150,7 +161,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		senderUUID, _ := conversationMap["sender_uuid"].(string)
 
 		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationID, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
 			log.Println(err)
 		}
 	}
