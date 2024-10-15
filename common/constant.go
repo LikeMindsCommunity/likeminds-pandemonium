@@ -27,6 +27,8 @@ const (
 	TopicTypeChatroomDynamic    = "chatroom:%v"
 	RawData                     = "raw_data"
 	DRUser                      = "dr_user_"
+	DeliveryCount               = "delivery_count"
+	SenderUUID                  = "sender_uuid"
 )
 
 const (
@@ -57,10 +59,6 @@ const (
 	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
 	ErrorMarshalErrorJson      = "marshal error: %v"
 	ErrorInvalidJSONFormat     = "invalid JSON format: %v"
-	ErrorFailedToFetchField    = "failed to fetch field %s from key %s: %w"
-	ErrorFailedToSetFields     = "failed to set fields for key %s: %w"
-	ErrorMissingTimestamp      = "min_timestamp and max_timestamp are required"
-	ErrorInvalidTimestamp      = "invalid timestamp format"
 )
 
 const (
@@ -71,4 +69,8 @@ const (
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
+)
+
+const (
+	DeliveryReportTTL = 7 * 24 * time.Hour // 7 days TTL for delivery reports
 )

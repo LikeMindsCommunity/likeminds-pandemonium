@@ -38,16 +38,16 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
 
 	// Update the cache for chatroom and conversation
-	err := SaveZSet(redisClient, chatroomKey, float64(conversationResponse.Conversation.CreatedAt), conversationKey, 7*24*time.Hour)
+	err := SaveZSet(redisClient, chatroomKey, float64(conversationResponse.Conversation.CreatedAt), conversationKey, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
 
 	sentDRValue := map[string]interface{}{
-		"delivery_count": participantsCount,
-		"sender_uuid":    userUUID,
+		common.DeliveryCount: participantsCount,
+		common.SenderUUID:    userUUID,
 	}
-	err = SaveHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix, sentDRValue, 7*24*time.Hour)
+	err = SaveHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix, sentDRValue, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerPare
 
 // UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
 func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey string, deliveredDeviceID, senderUUID, deliveredUUID string) error {
-	// If the message sender is same as message delivered user, no need to update
+	// If the message sender is the same as the message delivered user, no need to update
 	if senderUUID == deliveredUUID {
 		return nil
 	}
@@ -92,7 +92,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	// Set the current timestamp as the delivered timestamp.
 	currentTimestamp := time.Now().UnixMilli()
 	// Update the Redis key with the new delivered report.
-	err = SaveHashSet(redisClient, conversationKey, deliveredUUIDField, currentTimestamp, 7*24*time.Hour)
+	err = SaveHashSet(redisClient, conversationKey, deliveredUUIDField, currentTimestamp, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func DeliveryReportHandler(c *gin.Context) {
 	// Parse the request body to extract chatroom_id and conversation_ids.
 	var request DeliveryReportRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GeneralBadRequestError(c, common.ErrorInvalidJSONFormat)
+		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
 		return
 	}
 
@@ -180,7 +180,7 @@ func DeliveryReportHandler(c *gin.Context) {
 	}
 	_, err := pipe.Exec(c)
 	if err != nil {
-		api.GeneralAPIError(c, err.Error())
+		api.GeneralAPIError(c, fmt.Sprintf(common.ErrorFailedCacheFetchRedis, err))
 		return
 	}
 
@@ -212,9 +212,9 @@ func DeliveryReportHandler(c *gin.Context) {
 
 		// Add the conversation data to the delivery report map directly.
 		deliveryReport[conversationID] = map[string]interface{}{
-			"delivery_count": metaMap["delivery_count"],
-			"sender_uuid":    metaMap["sender_uuid"],
-			"delivered_dr":   extractDeliveredDRFields(data),
+			common.DeliveryCount: metaMap[common.DeliveryCount],
+			common.SenderUUID:    metaMap[common.SenderUUID],
+			constant.DeliveredDR: extractDeliveredDRFields(data),
 		}
 	}
 
