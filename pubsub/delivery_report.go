@@ -124,12 +124,6 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	return nil
 }
 
-// DeliveryReportRequest defines the structure of the request body for the /delivery_report API.
-type DeliveryReportRequest struct {
-	ChatroomID      string   `json:"chatroom_id" binding:"required"`
-	ConversationIDs []string `json:"conversation_ids" binding:"required"`
-}
-
 // DeliveryReportResponse defines the structure of the response for the /delivery_report API.
 type DeliveryReportResponse struct {
 	DeliveryReport map[string]map[string]interface{} `json:"delivery_report"`
@@ -144,21 +138,22 @@ func DeliveryReportHandler(c *gin.Context) {
 		return
 	}
 
-	// Parse the request body to extract chatroom_id and conversation_ids.
-	var request DeliveryReportRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
-		return
-	}
-
-	// Validate that chatroom_id and conversation_ids are present.
-	chatroomID := request.ChatroomID
+	// Extract chatroom_id and conversation_ids from GET parameters.
+	chatroomID := c.Query(common.ParamChatroomID)
 	if chatroomID == "" {
 		api.GeneralBadRequestError(c, common.ErrorChatroomIDMissing)
 		return
 	}
-	conversationIDs := request.ConversationIDs
-	if len(conversationIDs) == 0 {
+
+	conversationIDsParam := c.Query(common.ParamConversationIDs)
+	if conversationIDsParam == "" || conversationIDsParam == "null" {
+		api.GeneralBadRequestError(c, common.ErrorConversationIDsMissing)
+		return
+	}
+
+	// Parse conversation_ids into an array of strings using Unmarshal.
+	var conversationIDs []string
+	if err := json.Unmarshal([]byte(conversationIDsParam), &conversationIDs); err != nil {
 		api.GeneralBadRequestError(c, common.ErrorConversationIDsMissing)
 		return
 	}
@@ -168,7 +163,7 @@ func DeliveryReportHandler(c *gin.Context) {
 
 	// Fetch the conversation delivery report data for all provided conversation IDs.
 	conversationKeys := make([]string, len(conversationIDs))
-	for i, conversationID := range request.ConversationIDs {
+	for i, conversationID := range conversationIDs {
 		conversationKeys[i] = fmt.Sprintf(common.DRConversationPrefix, conversationID)
 	}
 
