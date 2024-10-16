@@ -29,6 +29,8 @@ const (
 	DRUser                      = "dr_user_"
 	DeliveryCount               = "delivery_count"
 	SenderUUID                  = "sender_uuid"
+	ParamChatroomID             = "chatroom_id"
+	ParamConversationIDs        = "conversation_ids"
 )
 
 const (
@@ -69,6 +71,7 @@ const (
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
+	ErrorConversationIDsInvalid  = "invalid conversation IDs in request"
 )
 
 const (
