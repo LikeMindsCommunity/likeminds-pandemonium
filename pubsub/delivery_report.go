@@ -101,10 +101,20 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	// Send the updated delivered report to the conversation creator's connection.
 	client := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
 	if client != nil {
-		// Create the payload for the delivered report.
-		deliveredReport := map[string]interface{}{
-			deliveredUUIDField: currentTimestamp,
+		// Fetch the existing conversation metadata to include in the delivered report.
+		conversationMeta, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
+		if err != nil || conversationMeta == "" {
+			return fmt.Errorf("failed to fetch conversation meta: %v", err)
 		}
+
+		// Unmarshal the conversation metadata into a map.
+		var deliveredReport map[string]interface{}
+		if err := json.Unmarshal([]byte(conversationMeta), &deliveredReport); err != nil {
+			return fmt.Errorf("failed to unmarshal conversation meta: %v", err)
+		}
+
+		// Include the new delivered report field in the response.
+		deliveredReport[deliveredUUIDField] = currentTimestamp
 
 		// Marshal the updated delivered report for the response.
 		deliveredReportBytes, err := json.Marshal(deliveredReport)
