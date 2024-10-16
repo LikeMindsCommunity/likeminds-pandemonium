@@ -18,7 +18,7 @@ var (
 
 const (
 	// AppVersion | current application version
-	AppVersion string = "0.1.1"
+	AppVersion string = "0.2.0"
 )
 
 func main() {
