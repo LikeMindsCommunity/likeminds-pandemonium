@@ -212,9 +212,9 @@ func DeliveryReportHandler(c *gin.Context) {
 
 		// Add the conversation data to the delivery report map directly.
 		deliveryReport[conversationID] = map[string]interface{}{
-			common.DeliveryCount: metaMap[common.DeliveryCount],
-			common.SenderUUID:    metaMap[common.SenderUUID],
-			constant.DeliveredDR: extractDeliveredDRFields(data),
+			common.DeliveryCount:               metaMap[common.DeliveryCount],
+			common.SenderUUID:                  metaMap[common.SenderUUID],
+			common.TopicMessageTypeDeliveredDR: extractDeliveredDRFields(data),
 		}
 	}
 
