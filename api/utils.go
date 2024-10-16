@@ -17,14 +17,14 @@ type Response struct {
 }
 
 // GenerateResponse to be sent on request success
-func GenerateResponse(c *gin.Context, dataResponse map[string]interface{}) {
+func GenerateResponse(c *gin.Context, dataResponse interface{}) {
 	//Generating Response Object
 	response := Response{
 		Success: true,
 	}
 
 	//Removing Blank Data Key
-	if len(dataResponse) > 0 {
+	if dataResponse != nil {
 		response.Data = dataResponse
 	}
 
@@ -54,4 +54,18 @@ func Contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func GeneralUnauthorizedError(c *gin.Context, errorMessage string) {
+	c.JSON(http.StatusUnauthorized, Response{
+		Success:      false,
+		ErrorMessage: errorMessage,
+	})
+}
+
+func GeneralStatusNotFoundError(c *gin.Context, errorMessage string) {
+	c.JSON(http.StatusNotFound, Response{
+		Success:      false,
+		ErrorMessage: errorMessage,
+	})
 }
