@@ -31,6 +31,7 @@ const (
 	SenderUUID                  = "sender_uuid"
 	ParamChatroomID             = "chatroom_id"
 	ParamConversationIDs        = "conversation_ids"
+	TopicTypeCommunityDynamic   = "community:%v"
 )
 
 const (

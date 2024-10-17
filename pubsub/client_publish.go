@@ -35,7 +35,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
-				go updateSentDR(c, topic)
+				go updateSentDR(c)
 
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
@@ -69,7 +69,7 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	api.GenerateResponse(c, nil)
 }
 
-func updateSentDR(c *gin.Context, topic string) {
+func updateSentDR(c *gin.Context) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	//Reusing it from gin context
 	rawData, _ := c.Get(common.RawData)
@@ -77,7 +77,7 @@ func updateSentDR(c *gin.Context, topic string) {
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	if err := UpdateSentDR(redisClient, wsServerParent, topic, deviceID, rawData.([]byte)); err != nil {
+	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
 		log.Println(err)
 	}
 }
@@ -85,6 +85,7 @@ func updateSentDR(c *gin.Context, topic string) {
 type PublishDeliveredDR struct {
 	MinTimestamp string `json:"min_timestamp"`
 	MaxTimestamp string `json:"max_timestamp"`
+	CommunityID  string `json:"community_id"`
 }
 
 func updateDeliveredDROnPublish(c *gin.Context, topic string) {
@@ -110,7 +111,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
 		return
 	}
-	
+
 	// Construct the Redis key for the chatroom delivery report.
 	redisKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 
@@ -148,7 +149,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		senderUUID, _ := conversationMap["sender_uuid"].(string)
 
 		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
 			log.Println(err)
 		}
 	}
