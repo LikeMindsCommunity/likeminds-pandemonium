@@ -7,9 +7,10 @@ const (
 const (
 	RedisPublish   = "/publish/:topic"
 	RedisSubscribe = "/subscribe/:topic"
+	DeliveryReport = "/delivery_report"
 )
 
 const (
-	HeadersMemberId = "x-member-id"
-	HeadersDeviceId = "x-device-id"
+	HeadersMemberID = "x-member-id"
+	HeadersDeviceID = "x-device-id"
 )
