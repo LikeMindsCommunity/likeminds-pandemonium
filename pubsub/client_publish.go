@@ -35,7 +35,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
-				go updateSentDR(c)
+				updateSentDR(c)
 
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
@@ -77,9 +77,11 @@ func updateSentDR(c *gin.Context) {
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
-		log.Println(err)
-	}
+	go func() {
+		if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
+			log.Println(err)
+		}
+	}()
 }
 
 type PublishDeliveredDR struct {
