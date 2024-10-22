@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
@@ -35,7 +36,6 @@ func PublishWithMethod(c *gin.Context, method int) {
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
 				publishRawDataOnTopic(c, topic, topicMessageType)
-				updateSentDR(c)
 
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
@@ -52,8 +52,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	rawData, _ := c.GetRawData()
-	//To reuse rawData
-	c.Set(common.RawData, rawData)
+
 	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
 	responseBytes, err := json.Marshal(psResponse)
 	if err != nil {
@@ -61,6 +60,11 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	}
 
 	redisClient := GetRedisClientFromContext(c)
+
+	//update sent delivery report
+	wsServerParent := ws.GetWsServerParentFromContext(c)
+	go updateSentDR(redisClient, wsServerParent, deviceID, rawData)
+
 	// publish rawData to pubsub channel:<chatroomID>
 	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
 		api.GeneralAPIError(c, err.Error())
@@ -69,19 +73,10 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	api.GenerateResponse(c, nil)
 }
 
-func updateSentDR(c *gin.Context) {
-	deviceID := c.GetHeader(constant.HeadersDeviceID)
-	//Reusing it from gin context
-	rawData, _ := c.Get(common.RawData)
-
-	redisClient := GetRedisClientFromContext(c)
-	wsServerParent := ws.GetWsServerParentFromContext(c)
-
-	go func() {
-		if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
-			log.Println(err)
-		}
-	}()
+func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData interface{}) {
+	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
+		log.Println(err)
+	}
 }
 
 type PublishDeliveredDR struct {
