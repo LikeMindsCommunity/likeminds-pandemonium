@@ -130,11 +130,11 @@ func NewWsServerParent() *WsServerParent {
 
 // GetWsServerParentFromContext Exposed api method to get WsServerParent from context
 func GetWsServerParentFromContext(c *gin.Context) *WsServerParent {
-	redisClient, exists := c.Get(common.WsServerKey)
+	wsServerParent, exists := c.Get(common.WsServerKey)
 	if !exists {
 		return nil
 	}
-	return redisClient.(*WsServerParent)
+	return wsServerParent.(*WsServerParent)
 }
 
 // GetWsServer returns the WsServer for the given topic from WsServerParent
