@@ -22,7 +22,7 @@ type DeliveryReport struct {
 	UserUUID       interface{} `json:"user_uuid"`
 }
 
-func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic, deviceID string, rawData []byte) error {
+func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData []byte) error {
 	var conversationResponse models.ConversationResponse
 	if err := json.Unmarshal(rawData, &conversationResponse); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
@@ -32,6 +32,7 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	chatroomID := conversationResponse.Conversation.ChatroomID
 	userUUID := conversationResponse.Conversation.Member.UUID
 	participantsCount := conversationResponse.TotalParticipantsCount
+	communityID := conversationResponse.Conversation.CommunityID
 
 	// Create the cache keys
 	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
@@ -52,11 +53,18 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		return err
 	}
 
-	// Send the payload to the conversation creator
-	client := wsServerParent.GetConnectionFromWsServer(topic, userUUID)
-	if client != nil {
+	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
+	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
+	// Send the updated delivered report to the conversation creator's connection.
+	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, userUUID)
+	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, userUUID)
+	finalClient := clientConnectedToChatroom
+	if finalClient == nil {
+		finalClient = clientConnectedToCommunity
+	}
+	if finalClient != nil {
 		payload := NewResponse(deviceID, common.TopicMessageTypeSentDR, string(rawData))
-		if err := client.SendPayloadToClientConnection(payload); err != nil {
+		if err := finalClient.SendPayloadToClientConnection(payload); err != nil {
 			return err
 		}
 	}
@@ -65,14 +73,14 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 }
 
 // UpdateDeliveredDRWithConversationID updates the delivered report in Redis and sends a payload to the conversation creator.
-func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, senderUUID, deliveredUUID string) error {
+func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, senderUUID, deliveredUUID string, communityID interface{}) error {
 	// Fetch and update the dr_conversation_<conversation_id>
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
-	return UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID)
+	return UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, communityID)
 }
 
 // UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
-func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey string, deliveredDeviceID, senderUUID, deliveredUUID string) error {
+func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey string, deliveredDeviceID, senderUUID, deliveredUUID string, communityID interface{}) error {
 	// If the message sender is the same as the message delivered user, no need to update
 	if senderUUID == deliveredUUID {
 		return nil
@@ -81,7 +89,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	// Construct the field for the delivered report using the new key format.
 	deliveredUUIDField := fmt.Sprintf(common.DRUserPrefix, deliveredUUID)
 
-	// Check if the delivered report for this user already exists.
+	// Check if the delivered eport for this user already exists.
 	existingDeliveredReport, err := FetchFieldFromHashSet(redisClient, conversationKey, deliveredUUIDField)
 
 	// If the delivered report already exists, no need to update.
@@ -98,9 +106,15 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	}
 
 	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
+	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
 	// Send the updated delivered report to the conversation creator's connection.
-	client := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
-	if client != nil {
+	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
+	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, senderUUID)
+	finalClient := clientConnectedToChatroom
+	if finalClient == nil {
+		finalClient = clientConnectedToCommunity
+	}
+	if finalClient != nil {
 		// Fetch the existing conversation metadata to include in the delivered report.
 		conversationMeta, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
 		if err != nil || conversationMeta == "" {
@@ -126,7 +140,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 		deliveredReportResponse := NewResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, string(deliveredReportBytes))
 
 		// Send the payload via WebSocket to the conversation creator.
-		if err := client.SendPayloadToClientConnection(deliveredReportResponse); err != nil {
+		if err := finalClient.SendPayloadToClientConnection(deliveredReportResponse); err != nil {
 			return err
 		}
 	}
@@ -237,7 +251,9 @@ func extractDeliveredDRFields(data map[string]string) map[string]interface{} {
 	// Iterate through all fields in the Redis hash and find delivered report fields.
 	for key, value := range data {
 		if strings.HasPrefix(key, common.DRUser) {
-			deliveredDR[key] = value
+			// Remove the prefix from the key before adding it to the map.
+			strippedKey := strings.TrimPrefix(key, common.DRUser)
+			deliveredDR[strippedKey] = value
 		}
 	}
 	return deliveredDR

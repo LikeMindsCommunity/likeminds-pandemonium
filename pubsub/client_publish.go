@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
@@ -34,8 +35,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 		case common.TopicTypeChatroom:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType)
-				go updateSentDR(c, topic)
+				publishRawDataOnTopic(c, topic, topicMessageType, true)
 
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
@@ -43,17 +43,16 @@ func PublishWithMethod(c *gin.Context, method int) {
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType)
+				publishRawDataOnTopic(c, topic, topicMessageType, false)
 			}
 		}
 	}
 }
 
-func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) {
+func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string, toUpdateSentDR bool) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	rawData, _ := c.GetRawData()
-	//To reuse rawData
-	c.Set(common.RawData, rawData)
+
 	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
 	responseBytes, err := json.Marshal(psResponse)
 	if err != nil {
@@ -61,6 +60,13 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	}
 
 	redisClient := GetRedisClientFromContext(c)
+	
+	//update sent delivery report when message is received in chatroom topic
+	wsServerParent := ws.GetWsServerParentFromContext(c)
+	if toUpdateSentDR {
+		go updateSentDR(redisClient, wsServerParent, deviceID, rawData)
+	}
+
 	// publish rawData to pubsub channel:<chatroomID>
 	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
 		api.GeneralAPIError(c, err.Error())
@@ -69,15 +75,8 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	api.GenerateResponse(c, nil)
 }
 
-func updateSentDR(c *gin.Context, topic string) {
-	deviceID := c.GetHeader(constant.HeadersDeviceID)
-	//Reusing it from gin context
-	rawData, _ := c.Get(common.RawData)
-
-	redisClient := GetRedisClientFromContext(c)
-	wsServerParent := ws.GetWsServerParentFromContext(c)
-
-	if err := UpdateSentDR(redisClient, wsServerParent, topic, deviceID, rawData.([]byte)); err != nil {
+func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData interface{}) {
+	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
 		log.Println(err)
 	}
 }
@@ -85,6 +84,7 @@ func updateSentDR(c *gin.Context, topic string) {
 type PublishDeliveredDR struct {
 	MinTimestamp string `json:"min_timestamp"`
 	MaxTimestamp string `json:"max_timestamp"`
+	CommunityID  string `json:"community_id"`
 }
 
 func updateDeliveredDROnPublish(c *gin.Context, topic string) {
@@ -110,7 +110,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
 		return
 	}
-	
+
 	// Construct the Redis key for the chatroom delivery report.
 	redisKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 
@@ -148,7 +148,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		senderUUID, _ := conversationMap["sender_uuid"].(string)
 
 		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
 			log.Println(err)
 		}
 	}

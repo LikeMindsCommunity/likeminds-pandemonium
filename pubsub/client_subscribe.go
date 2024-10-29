@@ -286,8 +286,9 @@ func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.
 	senderUUID := conversationResponse.Conversation.Member.UUID
 	conversationID := conversationResponse.Conversation.ID
 	chatroomID := conversationResponse.Conversation.ChatroomID
+	communityID := conversationResponse.Conversation.CommunityID
 
-	if err := UpdateDeliveredDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID); err != nil {
+	if err := UpdateDeliveredDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID, communityID); err != nil {
 		log.Println(err)
 	}
 }
