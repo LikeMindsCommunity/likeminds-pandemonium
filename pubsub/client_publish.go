@@ -60,7 +60,7 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	}
 
 	redisClient := GetRedisClientFromContext(c)
-
+	
 	//update sent delivery report when message is received in chatroom topic
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 	if toUpdateSentDR {
