@@ -89,7 +89,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	// Construct the field for the delivered report using the new key format.
 	deliveredUUIDField := fmt.Sprintf(common.DRUserPrefix, deliveredUUID)
 
-	// Check if the delivered report for this user already exists.
+	// Check if the delivered eport for this user already exists.
 	existingDeliveredReport, err := FetchFieldFromHashSet(redisClient, conversationKey, deliveredUUIDField)
 
 	// If the delivered report already exists, no need to update.

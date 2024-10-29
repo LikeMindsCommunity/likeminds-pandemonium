@@ -35,7 +35,7 @@ func PublishWithMethod(c *gin.Context, method int) {
 		case common.TopicTypeChatroom:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType)
+				publishRawDataOnTopic(c, topic, topicMessageType, true)
 
 			case common.TopicMessageTypeDeliveredDR:
 				updateDeliveredDROnPublish(c, topic)
@@ -43,13 +43,13 @@ func PublishWithMethod(c *gin.Context, method int) {
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
 			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType)
+				publishRawDataOnTopic(c, topic, topicMessageType, false)
 			}
 		}
 	}
 }
 
-func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string) {
+func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string, toUpdateSentDR bool) {
 	deviceID := c.GetHeader(constant.HeadersDeviceID)
 	rawData, _ := c.GetRawData()
 
@@ -61,9 +61,11 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 
 	redisClient := GetRedisClientFromContext(c)
 
-	//update sent delivery report
+	//update sent delivery report when message is received in chatroom topic
 	wsServerParent := ws.GetWsServerParentFromContext(c)
-	go updateSentDR(redisClient, wsServerParent, deviceID, rawData)
+	if toUpdateSentDR {
+		go updateSentDR(redisClient, wsServerParent, deviceID, rawData)
+	}
 
 	// publish rawData to pubsub channel:<chatroomID>
 	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
