@@ -60,7 +60,7 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	}
 
 	redisClient := GetRedisClientFromContext(c)
-	
+
 	//update sent delivery report when message is received in chatroom topic
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 	if toUpdateSentDR {
@@ -82,9 +82,9 @@ func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 }
 
 type PublishDeliveredDR struct {
-	MinTimestamp string `json:"min_timestamp"`
-	MaxTimestamp string `json:"max_timestamp"`
-	CommunityID  string `json:"community_id"`
+	MinTimestamp string      `json:"min_timestamp"`
+	MaxTimestamp string      `json:"max_timestamp"`
+	CommunityID  interface{} `json:"community_id"`
 }
 
 func updateDeliveredDROnPublish(c *gin.Context, topic string) {
