@@ -72,7 +72,7 @@ const (
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
-	ErrorConversationIDsInvalid  = "invalid conversation IDs in request"
+	ErrorConversationIDMissing   = "conversation ID is missing in request"
 )
 
 const (
