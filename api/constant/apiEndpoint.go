@@ -11,14 +11,16 @@ const (
 )
 
 const (
-	HeadersMemberID = "x-member-id"
-	HeadersDeviceID = "x-device-id"
+	HeadersMemberID     = "x-member-id"
+	HeadersDeviceID     = "x-device-id"
+	HeadersPlatformCode = "x-platform-code"
 )
 
 const (
-	HTTPResponseCodeOK           = 200
-	HTTPResonseCodeCreated       = 201
-	HTTPResponseCodeBadRequest   = 404
-	HTTPResponseCodeUnauthorised = 401
-	HTTPResponseCodeForbidden    = 403
+	HTTPResponseCodeOK                  = 200
+	HTTPResonseCodeCreated              = 201
+	HTTPResponseCodeBadRequest          = 404
+	HTTPResponseCodeUnauthorised        = 401
+	HTTPResponseCodeForbidden           = 403
+	HTTPResponseCodeInternalServerError = 500
 )

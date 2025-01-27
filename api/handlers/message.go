@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/api/helpers"
 	"likeminds-pandemonium/api/models"
 	requestresponse "likeminds-pandemonium/api/request_response"
@@ -9,43 +11,42 @@ import (
 	"log"
 )
 
-func CreateMessage(messageData map[string]interface{}, userID string, deviceID string, topic string) requestresponse.PSResponse {
+func CreateMessage(messageData map[string]interface{}, userID string, deviceID string, topic string, platformCode string) requestresponse.PSResponse {
 
-	CreateMessageResponse := requestresponse.PSResponse{
+	psResponse := &requestresponse.PSResponse{
 		DeviceID:         deviceID,
 		TopicMessageType: common.TopicMessageTypeCreateConversationResponse,
 		RawData:          "",
 	}
 
+	createMessageResponse := &requestresponse.CreateMessageResponse{}
+
 	CreateMessageData, err := json.Marshal(messageData["data"])
 	if err != nil {
-		log.Printf(common.ErrorMarshalErrorJson, err)
-		return CreateMessageResponse
+		var apiError = constant.APIErrorBadRequest(errors.New(common.ErrorMarshalErrorJson))
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
 	var createMessageRequest requestresponse.CreateMessageRequest
 	if err := json.Unmarshal(CreateMessageData, &createMessageRequest); err != nil {
-		log.Printf(common.ErrorUnmarshalErrorJson, err)
-		return CreateMessageResponse
+		var apiError = constant.APIErrorBadRequest(errors.New(common.ErrorMarshalErrorJson))
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	requestContext, err := helpers.ValidateCreateMessageRequest(createMessageRequest, userID, deviceID, topic)
-	if err != nil {
-		log.Print(err)
-		return CreateMessageResponse
+	requestContext, apiError := helpers.ValidateCreateMessageRequest(createMessageRequest, userID, deviceID, topic)
+	if apiError != nil {
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 	log.Print(requestContext)
 
-	err = helpers.ValidateCreateMessagePermission(&createMessageRequest, &requestContext.Chatroom, requestContext.UserInfo.UserID)
-	if err != nil {
-		log.Print(err)
-		return CreateMessageResponse
+	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, &requestContext.Chatroom, requestContext.UserInfo.UserID)
+	if apiError != nil {
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
 	collabcardState, err := helpers.GetUserCollabcardStateForChatroom(int(requestContext.Chatroom.ID), requestContext.UserInfo.UserID)
 	if err != nil {
 		log.Print(err)
-		return CreateMessageResponse
 	}
 
 	if collabcardState.ID != 0 {
@@ -60,28 +61,22 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 	}
 
 	createMessageModelInstance := &models.Message{}
-	err = helpers.FillCreateMessageModelInstance(createMessageModelInstance, &createMessageRequest, *requestContext, deviceID, isGuest)
-	if err != nil {
-		log.Print(err)
-		return CreateMessageResponse
+	apiError = helpers.FillCreateMessageModelInstance(createMessageModelInstance, &createMessageRequest, *requestContext, deviceID, isGuest, platformCode)
+	if apiError != nil {
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	messageID, err := helpers.CreateMessageInDB(createMessageModelInstance)
-	if err != nil {
-		log.Print(err)
-		return CreateMessageResponse
+	createMessageAttachmentModelInstances := &[]models.MessageAttachment{}
+	apiError = helpers.FillCreateMessageAttachmentsModelInstances(createMessageAttachmentModelInstances, createMessageRequest.Attachments)
+	if apiError != nil {
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+	}
+
+	messageID, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances)
+	if apiError != nil {
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 	log.Printf("created_message id=%d", messageID)
 
-	dataResponse := &requestresponse.CreateMessageResponse{}
-	helpers.FillDataResponse(dataResponse, createMessageModelInstance)
-
-	dataResponseBytes, err := json.Marshal(*dataResponse)
-	if err != nil {
-		log.Printf(common.ErrorMarshalErrorJson, err)
-		return CreateMessageResponse
-	}
-	CreateMessageResponse.RawData = string(dataResponseBytes)
-
-	return CreateMessageResponse
+	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, createMessageModelInstance)
 }

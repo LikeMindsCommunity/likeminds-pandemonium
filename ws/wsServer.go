@@ -21,6 +21,8 @@ type Client struct {
 	DeviceID string
 	// Topic on which client is connected
 	Topic string
+	// Platform Code of user
+	PlatformCode string
 }
 
 // WsServer represents web socket server
@@ -35,13 +37,14 @@ type WsServerParent struct {
 }
 
 // NewClient creates new client which will be added to WsServer
-func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID string, topic string) *Client {
+func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID string, topic string, platformCode string) *Client {
 	return &Client{
-		Conn:     conn,
-		WsServer: wsServer,
-		UUID:     UUID,
-		DeviceID: deviceID,
-		Topic:    topic,
+		Conn:         conn,
+		WsServer:     wsServer,
+		UUID:         UUID,
+		DeviceID:     deviceID,
+		Topic:        topic,
+		PlatformCode: platformCode,
 	}
 }
 

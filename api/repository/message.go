@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
 
@@ -32,21 +33,40 @@ func GetMessageByID(ID string) (*models.Message, error) {
 	return message, nil
 }
 
-func CreateMessage(createMessageModelInstance *models.Message) (int, error) {
+func CreateMessage(createMessageModelInstance *models.Message, createMessageAttachmentModelInstances []models.MessageAttachment) (int, error) {
 	messageID := int64(0)
-	err := NewMessageRepository().messageDatabase.Transaction(func(tx *gorm.DB) error {
-		message := tx.Create(createMessageModelInstance)
-		if message.Error != nil {
-			return message.Error
-		}
-		messageID = createMessageModelInstance.ID
 
-		// return nil will commit the whole transaction
-		return nil
-	})
-	if err != nil {
-		return int(messageID), err
+	tx := NewMessageRepository().messageDatabase.Begin()
+
+	message := tx.Create(createMessageModelInstance)
+	if message.Error != nil {
+		tx.Rollback()
+		return 0, errors.New("failed to create message in database, rollingback")
 	}
+	messageID = createMessageModelInstance.ID
+
+	createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))
+	if err != nil {
+		tx.Rollback()
+		return 0, errors.New("failed to attach messageID to attachments, rollingback")
+	}
+	attachments := tx.Create(createMessageAttachmentModelInstances)
+	if attachments.Error != nil {
+		tx.Rollback()
+		return 0, errors.New("failed to create message attachments in database, rollingback")
+	}
+	if int(attachments.RowsAffected) != len(createMessageAttachmentModelInstances) {
+		tx.Rollback()
+		return 0, errors.New("failed to create all message attachments in database, rollingback")
+	}
+	tx.Commit()
 
 	return int(messageID), nil
+}
+
+func updateAttachmentsWithMessageID(createMessageAttachmentModelInstances []models.MessageAttachment, messageID int) ([]models.MessageAttachment, error) {
+	for i := range createMessageAttachmentModelInstances {
+		createMessageAttachmentModelInstances[i].AnswerID = messageID
+	}
+	return createMessageAttachmentModelInstances, nil
 }

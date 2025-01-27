@@ -13,6 +13,7 @@ import (
 	"log"
 	"regexp"
 	"slices"
+	"strconv"
 	"time"
 )
 
@@ -23,44 +24,46 @@ type CreateMessageRequestContext struct {
 	OriginalMessage models.Message   `json:"original_message"`
 }
 
-func ValidateCreateMessageRequest(createMessageRequest requestresponse.CreateMessageRequest, userID string, deviceID string, topic string) (*CreateMessageRequestContext, error) {
+func ValidateCreateMessageRequest(createMessageRequest requestresponse.CreateMessageRequest, userID string, deviceID string, topic string) (*CreateMessageRequestContext, *constant.APIError) {
 
 	createMessageRequestContext := &CreateMessageRequestContext{}
 
-	err := validateWsChatroomID(createMessageRequest.ChatroomID.(float64), topic)
+	err := validateWsChatroomID(createMessageRequest.ChatroomID, topic)
 	if err != nil {
-		return nil, err
+		return nil, constant.APIErrorBadRequest(err)
 	}
 
 	userinfo, err := GetUserInfoByUUID(userID)
 	if err != nil {
-		return nil, err
+		return nil, constant.APIErrorBadRequest(errors.New(common.ErrorUserNotFound))
 	}
 	createMessageRequestContext.UserInfo = *userinfo
 
-	chatroom, err := GetChatroomByID(createMessageRequest.ChatroomID.(float64))
+	chatroom, err := GetChatroomByID(createMessageRequest.ChatroomID)
 	if err != nil {
-		return nil, err
+		return nil, constant.APIErrorBadRequest(errors.New(common.ErrorChatroomNotFound))
 	}
 	createMessageRequestContext.Chatroom = *chatroom
 
 	if chatroom.IsSecret && !ValidateUserSecretChatroomAccess([]byte(*chatroom.SecretChatroomParticipants), userinfo.UserID) {
-		return nil, fmt.Errorf("chatroom not found")
+		return nil, constant.APIErrorBadRequest(errors.New(common.ErrorChatroomNotFound))
 	}
 
 	community, err := GetCommunityByID(chatroom.CommunityID)
 	if err != nil {
-		return nil, err
+		return nil, constant.APIErrorBadRequest(errors.New(common.ErrorCommunityNotFound))
 	}
 	createMessageRequestContext.Community = *community
 
 	if createMessageRequest.RepliedConversationId != "" {
 		originalMessage, err := GetMessageByID(createMessageRequest.RepliedConversationId.(float64))
 		if err != nil {
-			return nil, err
+			return nil, constant.APIErrorBadRequest(errors.New(common.ErrorRepliedMessageNotFound))
 		}
 		createMessageRequestContext.OriginalMessage = *originalMessage
 	}
+
+	// TODO: validate poll create request
 
 	return createMessageRequestContext, nil
 }
@@ -74,24 +77,26 @@ func GetMessageByID(messageID float64) (*models.Message, error) {
 	return message, nil
 }
 
-func ValidateCreateMessagePermission(createMessageRequest *requestresponse.CreateMessageRequest, chatroom *models.Chatroom, userIDInt int) error {
+func ValidateCreateMessagePermission(createMessageRequest *requestresponse.CreateMessageRequest, chatroom *models.Chatroom, userIDInt int) *constant.APIError {
 	if chatroom.Type == constant.ChatroomTypeMasterIntro {
-		return errors.New("cannot post message in master intro chatroom")
+		return constant.APIErrorForbidden(errors.New("cannot post in community chatroom"))
 	}
 
 	memberState, err := repository.GetMemberStateInCommunity(chatroom.CommunityID, userIDInt)
 	if err != nil {
-		return errors.New("cannot get member state in community")
+		return constant.APIErrorForbidden(errors.New("cannot get member state in community"))
 	}
 
 	isMemberAdminInCommunity := IsMemberStateAdminInCommunity(memberState)
 	if !validateMessageGroupTags(createMessageRequest.Text, chatroom.IsSecret, chatroom.UserID, isMemberAdminInCommunity, userIDInt) {
-		return errors.New("invalid message group tags")
+		return constant.APIErrorForbidden(errors.New("invalid message group tags"))
 	}
 
 	if !ValidateUserRight(chatroom.CommunityID, userIDInt, constant.MemberRightRespondInRoom, int(chatroom.ID)) {
-		return fmt.Errorf("user right missing, right=%s", constant.MemberRightRespondInRoomEnum)
+		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightRespondInRoomEnum))
 	}
+
+	// TODO: validate poll permision
 
 	return nil
 }
@@ -116,7 +121,8 @@ func FillCreateMessageModelInstance(
 	createMessageRequest *requestresponse.CreateMessageRequest,
 	requestContext CreateMessageRequestContext,
 	deviceID string,
-	isGuest bool) error {
+	isGuest bool,
+	platformCode string) *constant.APIError {
 
 	createMessageModelInstance.Answer = createMessageRequest.Text
 	createMessageModelInstance.APIVersion = 1
@@ -130,20 +136,27 @@ func FillCreateMessageModelInstance(
 	createMessageModelInstance.IsGuest = isGuest
 	createMessageModelInstance.TemporaryID = &createMessageRequest.TemporaryID
 	createMessageModelInstance.UserID = int(requestContext.UserInfo.UserID)
-	// TODO: replied chatroom_id
-	// TODO: replied platform_code
+	createMessageModelInstance.Platform = &platformCode
+
+	if createMessageRequest.RepliedChatroomID != "" {
+		repliedChatroomID, err := strconv.Atoi(createMessageRequest.RepliedChatroomID)
+		if err != nil {
+			return constant.APIErrorBadRequest(err)
+		}
+		createMessageModelInstance.ReplyChatroomID = &repliedChatroomID
+	}
 
 	if int(createMessageRequest.State) == constant.ConversationStateConversationPoll {
 		err := FillCreatePollMessageModelInstance(createMessageModelInstance, createMessageRequest)
 		if err != nil {
-			return err
+			return constant.APIErrorBadRequest(err)
 		}
 	}
 
 	if int(createMessageRequest.State) == constant.ConversationStateConversationEvent {
 		err := FillCreateEventMessageModelInstance(createMessageModelInstance, createMessageRequest)
 		if err != nil {
-			return err
+			return constant.APIErrorBadRequest(err)
 		}
 	}
 
@@ -218,27 +231,97 @@ func FillCreateEventMessageModelInstance(createMessageModelInstance *models.Mess
 	return nil
 }
 
-func CreateMessageInDB(createMessageModelInstance *models.Message) (int, error) {
-	messageID, err := repository.CreateMessage(createMessageModelInstance)
+func FillCreateMessageAttachmentsModelInstances(createMessageAttachmentModelInstances *[]models.MessageAttachment, createMessageRequestAttachments []requestresponse.MessageAttachment) *constant.APIError {
+
+	for i := range createMessageRequestAttachments {
+		createMessageAttachmentModelInstance := &models.MessageAttachment{}
+		createMessageAttachmentModelInstance.Type = createMessageRequestAttachments[i].Type
+		createMessageAttachmentModelInstance.FileURL = createMessageRequestAttachments[i].FileURL
+		createMessageAttachmentModelInstance.LocationName = &createMessageRequestAttachments[i].LocationName
+		createMessageAttachmentModelInstance.LocationLat = createMessageRequestAttachments[i].LocationLat
+		createMessageAttachmentModelInstance.LocationLong = createMessageRequestAttachments[i].LocationLong
+		createMessageAttachmentModelInstance.Width = &createMessageRequestAttachments[i].Width
+		createMessageAttachmentModelInstance.Height = &createMessageRequestAttachments[i].Height
+		createMessageAttachmentModelInstance.ThumbnailURL = &createMessageRequestAttachments[i].ThumbnailURL
+		createMessageAttachmentModelInstance.CreatedAt = time.Now().Unix()
+
+		attachmentMetaMap := createMessageRequestAttachments[i].Meta.(map[string]interface{})
+		attachmentMetaByte, err := json.Marshal(attachmentMetaMap)
+		if err != nil {
+			return constant.APIErrorBadRequest(errors.New(common.ErrorMarshalErrorJson))
+		}
+		attachmentMetaString := string(attachmentMetaByte)
+
+		createMessageAttachmentModelInstance.Meta = &attachmentMetaString
+
+		createMessageAttachmentModelInstance.Name = &createMessageRequestAttachments[i].Name
+
+		*createMessageAttachmentModelInstances = append(*createMessageAttachmentModelInstances, *createMessageAttachmentModelInstance)
+	}
+
+	return nil
+}
+
+func CreateMessageInDB(createMessageModelInstance *models.Message, createMessageAttachmentModelInstances []models.MessageAttachment) (int, *constant.APIError) {
+	messageID, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances)
 	if err != nil {
-		return 0, err
+		return 0, constant.APIErrorInternalServerError(err)
 	}
 
 	return messageID, nil
 }
 
-func FillDataResponse(dataResponse *requestresponse.CreateMessageResponse, createMessageModelInstance *models.Message) {
-	dataResponse.Message = createMessageModelInstance
+func CreateMessageErrorResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) requestresponse.PSResponse {
+	fillCreateMessageErrorResponse(createMessageResponse, apiError)
+
+	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
+	if err != nil {
+		log.Printf(common.ErrorMarshalErrorJson, err)
+	}
+	psResponse.RawData = string(createMessageResponseBytes)
+
+	return *psResponse
 }
 
-func validateWsChatroomID(chatroomID float64, topic string) error {
+func fillCreateMessageErrorResponse(createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) {
+	createMessageResponse.HTTPStatusCode = apiError.HTTPStatusCode
+	createMessageResponse.Success = false
+	createMessageResponse.Message = nil
+	createMessageResponse.Error = apiError.Error()
+}
+
+func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, createMessageModelInstance *models.Message) requestresponse.PSResponse {
+	fillCreateMessageSuccessResponse(createMessageResponse, createMessageModelInstance)
+
+	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
+	if err != nil {
+		log.Printf(common.ErrorMarshalErrorJson, err)
+	}
+	psResponse.RawData = string(createMessageResponseBytes)
+
+	return *psResponse
+}
+
+func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, createMessageModelInstance *models.Message) {
+	createMessageResponse.HTTPStatusCode = constant.HTTPResponseCodeOK
+	createMessageResponse.Success = true
+	createMessageResponse.Message = createMessageModelInstance
+	createMessageResponse.Error = ""
+}
+
+func validateWsChatroomID(chatroomID int, topic string) error {
+	chatroomIDString := strconv.Itoa(chatroomID)
+
 	topicChatroomID, err := utilities.GetTopicSplit(topic)
 	if err != nil {
+		log.Print(err)
 		return err
 	}
-	if fmt.Sprintf("%g", chatroomID) != topicChatroomID[1] {
+
+	if chatroomIDString != topicChatroomID[1] {
 		return errors.New(common.ErrorChatroomIdMismatch)
 	}
+
 	return nil
 }
 

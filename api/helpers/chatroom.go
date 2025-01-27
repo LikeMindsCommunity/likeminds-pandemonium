@@ -1,13 +1,13 @@
 package helpers
 
 import (
-	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/api/repository"
+	"strconv"
 )
 
-func GetChatroomByID(chatroomID float64) (*models.Chatroom, error) {
-	chatroomIDStr := fmt.Sprintf("%g", chatroomID)
+func GetChatroomByID(chatroomID int) (*models.Chatroom, error) {
+	chatroomIDStr := strconv.Itoa(chatroomID)
 	chatroom, err := repository.GetChatroomByID(chatroomIDStr)
 	if err != nil {
 		return nil, err
