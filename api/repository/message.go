@@ -45,19 +45,21 @@ func CreateMessage(createMessageModelInstance *models.Message, createMessageAtta
 	}
 	messageID = createMessageModelInstance.ID
 
-	createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))
-	if err != nil {
-		tx.Rollback()
-		return 0, errors.New("failed to attach messageID to attachments, rollingback")
-	}
-	attachments := tx.Create(createMessageAttachmentModelInstances)
-	if attachments.Error != nil {
-		tx.Rollback()
-		return 0, errors.New("failed to create message attachments in database, rollingback")
-	}
-	if int(attachments.RowsAffected) != len(createMessageAttachmentModelInstances) {
-		tx.Rollback()
-		return 0, errors.New("failed to create all message attachments in database, rollingback")
+	if len(createMessageAttachmentModelInstances) > 0 {
+		createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))
+		if err != nil {
+			tx.Rollback()
+			return 0, errors.New("failed to attach messageID to attachments, rollingback")
+		}
+		attachments := tx.Create(createMessageAttachmentModelInstances)
+		if attachments.Error != nil {
+			tx.Rollback()
+			return 0, errors.New("failed to create message attachments in database, rollingback")
+		}
+		if int(attachments.RowsAffected) != len(createMessageAttachmentModelInstances) {
+			tx.Rollback()
+			return 0, errors.New("failed to create all message attachments in database, rollingback")
+		}
 	}
 	tx.Commit()
 

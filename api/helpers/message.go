@@ -138,6 +138,16 @@ func FillCreateMessageModelInstance(
 	createMessageModelInstance.UserID = int(requestContext.UserInfo.UserID)
 	createMessageModelInstance.Platform = &platformCode
 
+	if createMessageRequest.OGTags != nil {
+		ogTagsMap := createMessageRequest.OGTags.(map[string]interface{})
+		ogTagsByte, err := json.Marshal(ogTagsMap)
+		if err != nil {
+			return constant.APIErrorBadRequest(errors.New(common.ErrorMarshalErrorJson))
+		}
+		ogTagsString := string(ogTagsByte)
+		createMessageModelInstance.OgTags = &ogTagsString
+	}
+
 	if createMessageRequest.RepliedChatroomID != "" {
 		repliedChatroomID, err := strconv.Atoi(createMessageRequest.RepliedChatroomID)
 		if err != nil {
