@@ -3,6 +3,7 @@ package main
 import (
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/database"
 	"likeminds-pandemonium/middleware"
 	"likeminds-pandemonium/pubsub"
 	"likeminds-pandemonium/web"
@@ -24,6 +25,7 @@ const (
 func main() {
 	initGin()
 	redisClient := pubsub.InitRedisClient()
+	database.Postgres = database.ConnectPostgres()
 	wsServerParent := ws.NewWsServerParent()
 	router.Use(middleware.ApiMiddleware(redisClient, wsServerParent))
 

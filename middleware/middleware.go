@@ -1,10 +1,11 @@
 package middleware
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/ws"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 // ApiMiddleware will add the pubsub client  to the context

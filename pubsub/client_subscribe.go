@@ -3,17 +3,19 @@ package pubsub
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
-	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
+	"likeminds-pandemonium/api/handlers"
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -161,13 +163,41 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 	for {
 		messageType, jsonMessage, err := client.Conn.ReadMessage()
 		if err != nil {
-			log.Println(fmt.Sprintf(common.ErrorReadClientWs, err))
+			log.Printf(common.ErrorReadClientWs, err)
 			return
 		}
-		log.Println(fmt.Sprintf(common.ReceivedMessageClientWs, messageType))
-		// publish jsonMessage to pubsub TopicNameChatroom
-		if err := PublishMessageToRedis(redisClient, client.Topic, jsonMessage); err != nil {
+
+		var jsonMessageParsed map[string]interface{}
+		err = json.Unmarshal([]byte(jsonMessage), &jsonMessageParsed)
+		if err != nil {
+			log.Printf(common.ErrorInvalidJSONFormat, err)
 			return
+		}
+		if jsonMessageParsed["topic_message_type"] != nil && jsonMessageParsed["topic_message_type"] == "message.create.request" {
+			// create conversation data in database
+
+			log.Printf(common.ReceivedMessageClientWs, messageType)
+			log.Println(jsonMessageParsed["topic_message_type"])
+
+			CreateConversationResponse := handlers.CreateMessage(jsonMessageParsed, client.UUID, client.DeviceID, client.Topic)
+			log.Print(CreateConversationResponse)
+
+			// publish response to pubsub TopicNameChatroom
+			jsonCreateConversationResponse, err := json.Marshal(CreateConversationResponse)
+			if err != nil {
+				log.Printf(common.ErrorInvalidJSONFormat, err)
+				return
+			}
+			if err := PublishMessageToRedis(redisClient, client.Topic, jsonCreateConversationResponse); err != nil {
+				return
+			}
+
+		} else {
+			log.Printf(common.ReceivedMessageClientWs, messageType)
+			// publish jsonMessage to pubsub TopicNameChatroom
+			if err := PublishMessageToRedis(redisClient, client.Topic, jsonMessage); err != nil {
+				return
+			}
 		}
 	}
 }
@@ -243,6 +273,24 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 				}
 				log.Println(common.ReceivedMessageRedisWs)
 				go updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, client.DeviceID, &conversationResponse, client.UUID)
+
+			case common.TopicMessageTypeCreateConversationResponse:
+				// Create NextWriter of type websocket.TextMessage
+				w, err := client.Conn.NextWriter(websocket.TextMessage)
+				if err != nil {
+					log.Printf(common.ErrorWriterOpenWs, err)
+					return
+				}
+				_, err = w.Write(messagePayloadByte)
+				if err != nil {
+					log.Printf(common.ErrorUnableToWriteWs, err)
+					return
+				}
+				if err := w.Close(); err != nil {
+					log.Printf(common.ErrorWriterCloseWs, err)
+					return
+				}
+				log.Println(common.ReceivedMessageRedisWs)
 			}
 		}
 	}

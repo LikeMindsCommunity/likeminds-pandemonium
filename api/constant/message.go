@@ -1,0 +1,39 @@
+package constant
+
+const (
+	RegexTagEveryone     = `@everyone`
+	RegexTagParticipants = `@participants`
+)
+
+const (
+	ConversationStateAnswer int = iota
+	ConversationStateConversationHeader
+	ConversationStateConversationFollow
+	ConversationStateConversationUnfollow
+	ConversationStateConversationCreator
+	ConversationStateConversationCommunityEdit
+	ConversationStateConversationGuest
+	ConversationStateConversationAddParticipant
+	ConversationStateConversationLeaveChatroom
+	ConversationStateConversationRemovedFromChatroom
+	ConversationStateConversationPoll
+	ConversationStateConversationAddAllMembers
+	ConversationStateChatroomTopic
+	ConversationStateConversationDirectMessageMemberRemovedOrLeft
+	ConversationStateConversationDirectMessageCMRemoved
+	ConversationStateConversationDirectMessageMemberBecomesCMDisableChat
+	ConversationStateConversationDirectMessageCMBecomesMemberEnableChat
+	ConversationStateConversationDirectMessageMemberBecomesCMEnableChat
+	ConversationStateConversationEvent
+	ConversationStateConversationDirectMessageBlockMemberDisableChat
+	ConversationStateConversationDirectMessageUnblockMemberEnableChat
+	ConversationStateChatroomDelete
+)
+
+const (
+	ConversationPollAnswerText = "Be the first to vote"
+)
+
+const (
+	OnlineEventLinkEnableBeforeMinutes = 15
+)

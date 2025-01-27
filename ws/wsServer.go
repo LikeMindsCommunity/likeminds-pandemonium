@@ -3,9 +3,10 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
+	"likeminds-pandemonium/common"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"likeminds-pandemonium/common"
 )
 
 // Client represents the websocket client connected with the server
