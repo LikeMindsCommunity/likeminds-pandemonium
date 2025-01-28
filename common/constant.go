@@ -3,14 +3,17 @@ package common
 import "time"
 
 const (
-	RedisClient                  = "redis_client"
-	ReadBufferSizeDefault        = 4096
-	WriteBufferSizeDefault       = 4096
-	ParamTopic                   = "topic"
-	ParamTopicMessageType        = "topic_message_type"
-	TopicTypeChatroom            = "chatroom"
-	TopicTypeCommunity           = "community"
-	TopicMessageTypeConversation = "conversation"
+	RedisClient                                = "redis_client"
+	PostgresClient                             = "postgres_client"
+	ReadBufferSizeDefault                      = 4096
+	WriteBufferSizeDefault                     = 4096
+	ParamTopic                                 = "topic"
+	ParamTopicMessageType                      = "topic_message_type"
+	TopicTypeChatroom                          = "chatroom"
+	TopicTypeCommunity                         = "community"
+	TopicMessageTypeConversation               = "conversation"
+	TopicMessageTypeCreateConversationRequest  = "message.create.request"
+	TopicMessageTypeCreateConversationResponse = "message.create.response"
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer
@@ -73,6 +76,14 @@ const (
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
 	ErrorConversationIDsInvalid  = "invalid conversation IDs in request"
+	ErrorChatroomIdMismatch      = "chatroom ID mismatch in request on subscribed topic"
+)
+
+const (
+	ErrorUserNotFound           = "user not found"
+	ErrorChatroomNotFound       = "chatroom not found"
+	ErrorCommunityNotFound      = "community not found"
+	ErrorRepliedMessageNotFound = "replied conversation not found"
 )
 
 const (

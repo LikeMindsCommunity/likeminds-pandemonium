@@ -47,6 +47,8 @@ func Subscribe() gin.HandlerFunc {
 			UUID := c.GetHeader(constant.HeadersMemberID)
 			deviceID := c.GetHeader(constant.HeadersDeviceID)
 			platformCode := c.GetHeader(constant.HeadersPlatformCode)
+			versionCode := c.GetHeader(constant.HeadersVersionCode)
+			apiVersion := c.GetHeader(constant.HeadersApiVersion)
 			var chatroomID string
 			if len(topicSplit) > 1 {
 				chatroomID = topicSplit[1]
@@ -62,7 +64,7 @@ func Subscribe() gin.HandlerFunc {
 				return
 			}
 
-			err = ServeWs(wsServerParent, topic, UUID, deviceID, c.Writer, c.Request, redisClient, platformCode)
+			err = ServeWs(wsServerParent, topic, UUID, deviceID, c.Writer, c.Request, redisClient, platformCode, versionCode, apiVersion)
 			if err != nil {
 				updatedErr := fmt.Sprintf(common.ErrorFailedUpgrader, err)
 				api.GeneralAPIError(c, updatedErr)
@@ -72,6 +74,8 @@ func Subscribe() gin.HandlerFunc {
 			UUID := c.GetHeader(constant.HeadersMemberID)
 			deviceID := c.GetHeader(constant.HeadersDeviceID)
 			platformCode := c.GetHeader(constant.HeadersPlatformCode)
+			versionCode := c.GetHeader(constant.HeadersVersionCode)
+			apiVersion := c.GetHeader(constant.HeadersApiVersion)
 			var communityID string
 			if len(topicSplit) > 1 {
 				communityID = topicSplit[1]
@@ -86,7 +90,7 @@ func Subscribe() gin.HandlerFunc {
 				api.GeneralBadRequestError(c, common.ErrorCommunityIDMissing)
 				return
 			}
-			err = ServeWs(wsServerParent, topic, UUID, deviceID, c.Writer, c.Request, redisClient, platformCode)
+			err = ServeWs(wsServerParent, topic, UUID, deviceID, c.Writer, c.Request, redisClient, platformCode, versionCode, apiVersion)
 			if err != nil {
 				updatedErr := fmt.Sprintf(common.ErrorFailedUpgrader, err)
 				api.GeneralAPIError(c, updatedErr)
@@ -108,14 +112,14 @@ func createOrGetWsServer(wsServerParent *ws.WsServerParent, topic string) *ws.Ws
 }
 
 // ServeWs handles websocket requests of a chatroom from clients requests.
-func ServeWs(wsServerParent *ws.WsServerParent, topic string, UUID string, deviceID string, w http.ResponseWriter, r *http.Request, redisClient *redis.Client, platformCode string) error {
+func ServeWs(wsServerParent *ws.WsServerParent, topic string, UUID string, deviceID string, w http.ResponseWriter, r *http.Request, redisClient *redis.Client, platformCode string, versionCode string, apiVersion string) error {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return err
 	}
 
 	wsServer := createOrGetWsServer(wsServerParent, topic)
-	client := ws.NewClient(conn, wsServer, UUID, deviceID, topic, platformCode)
+	client := ws.NewClient(conn, wsServer, UUID, deviceID, topic, platformCode, versionCode, apiVersion)
 
 	go writePump(wsServerParent, client, redisClient, topic)
 	go readPump(wsServerParent, client, redisClient)
@@ -181,7 +185,7 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			log.Printf(common.ReceivedMessageClientWs, messageType)
 			log.Println(jsonMessageParsed["topic_message_type"])
 
-			CreateConversationResponse := handlers.CreateMessage(jsonMessageParsed, client.UUID, client.DeviceID, client.Topic, client.PlatformCode)
+			CreateConversationResponse := handlers.CreateMessage(jsonMessageParsed, client.UUID, client.DeviceID, client.Topic, client.PlatformCode, client.PlatformCode, client.ApiVersion)
 			log.Print(CreateConversationResponse)
 
 			// publish response to pubsub TopicNameChatroom

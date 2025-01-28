@@ -37,3 +37,9 @@ const (
 const (
 	OnlineEventLinkEnableBeforeMinutes = 15
 )
+
+const (
+	ConversationPollTypeInstant int = iota
+	ConversationPollTypeDeferred
+	ConversationPollTypeOpen
+)

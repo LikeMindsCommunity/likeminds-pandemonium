@@ -63,7 +63,12 @@ func ValidateCreateMessageRequest(createMessageRequest requestresponse.CreateMes
 		createMessageRequestContext.OriginalMessage = *originalMessage
 	}
 
-	// TODO: validate poll create request
+	if createMessageRequest.State == int32(constant.ConversationStateConversationPoll) {
+		err := validateCreatePollMessageRequest(createMessageRequest, community.ID)
+		if err != nil {
+			return nil, constant.APIErrorBadRequest(errors.New("failed to validate create poll message request"))
+		}
+	}
 
 	return createMessageRequestContext, nil
 }
@@ -77,12 +82,48 @@ func GetMessageByID(messageID float64) (*models.Message, error) {
 	return message, nil
 }
 
+func validateCreatePollMessageRequest(createMessageRequest requestresponse.CreateMessageRequest, communityID int64) error {
+	communityConfigurationChatPollDefault := &constant.CommunityConfiguration{}
+	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationChatPoll)
+	if err != nil && err.Error() != "record not found" {
+		log.Print(err)
+	}
+	if err != nil && err.Error() == "record not found" {
+		communityConfigurationChatPollDefault = constant.CommunityConfigurationChatPollDefault
+	}
+
+	if communityConfigurationChatPollDefault.Type == constant.CommunityConfigurationChatPoll {
+		if createMessageRequest.PollType == nil {
+			return errors.New("poll_type is missing, required")
+		}
+
+		if createMessageRequest.ExpiryTime == nil && !createMessageRequest.NoPollExpiry {
+			return errors.New("expiry_time is missing, required")
+		}
+
+		var pollType = new(int)
+		*pollType = int(*createMessageRequest.PollType)
+		if *pollType == constant.ConversationPollTypeDeferred && !createMessageRequest.NoPollExpiry {
+			return errors.New("expiry_time is missing, required")
+		}
+	} else {
+		communityConfigurationChatPollValue := configuration.Value
+		var communityConfigurationValueStruct constant.CommunityConfigurationValue
+		err := json.Unmarshal([]byte(communityConfigurationChatPollValue), &communityConfigurationValueStruct)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func ValidateCreateMessagePermission(createMessageRequest *requestresponse.CreateMessageRequest, chatroom *models.Chatroom, userIDInt int) *constant.APIError {
 	if chatroom.Type == constant.ChatroomTypeMasterIntro {
 		return constant.APIErrorForbidden(errors.New("cannot post in community chatroom"))
 	}
 
-	memberState, err := repository.GetMemberStateInCommunity(chatroom.CommunityID, userIDInt)
+	memberState, err := GetMemberStateInCommunity(chatroom.CommunityID, userIDInt)
 	if err != nil {
 		return constant.APIErrorForbidden(errors.New("cannot get member state in community"))
 	}
@@ -96,7 +137,10 @@ func ValidateCreateMessagePermission(createMessageRequest *requestresponse.Creat
 		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightRespondInRoomEnum))
 	}
 
-	// TODO: validate poll permision
+	if createMessageRequest.State == int32(constant.ConversationStateConversationPoll) &&
+		!ValidateUserRight(chatroom.CommunityID, userIDInt, constant.MemberRightCreatePoll, int(chatroom.ID)) {
+		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightCreatePollEnum))
+	}
 
 	return nil
 }

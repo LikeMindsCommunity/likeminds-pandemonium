@@ -14,6 +14,8 @@ const (
 	HeadersMemberID     = "x-member-id"
 	HeadersDeviceID     = "x-device-id"
 	HeadersPlatformCode = "x-platform-code"
+	HeadersVersionCode  = "x-version-code"
+	HeadersApiVersion   = "x-api-version"
 )
 
 const (

@@ -11,7 +11,7 @@ import (
 	"log"
 )
 
-func CreateMessage(messageData map[string]interface{}, userID string, deviceID string, topic string, platformCode string) requestresponse.PSResponse {
+func CreateMessage(messageData map[string]interface{}, userID string, deviceID string, topic string, platformCode string, versionCode string, apiVersion string) requestresponse.PSResponse {
 
 	psResponse := &requestresponse.PSResponse{
 		DeviceID:         deviceID,
