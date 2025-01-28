@@ -7,8 +7,10 @@ import (
 	"likeminds-pandemonium/api/helpers"
 	"likeminds-pandemonium/api/models"
 	requestresponse "likeminds-pandemonium/api/request_response"
+	"likeminds-pandemonium/api/utilities"
 	"likeminds-pandemonium/common"
 	"log"
+	"strconv"
 )
 
 func CreateMessage(messageData map[string]interface{}, userID string, deviceID string, topic string, platformCode string, versionCode string, apiVersion string) requestresponse.PSResponse {
@@ -77,6 +79,20 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 	log.Printf("created_message id=%d", messageID)
+
+	apiVersionInt, err := strconv.Atoi(apiVersion)
+	if err != nil {
+		log.Print(err)
+	}
+
+	utilities.SafeGo(func() {
+		helpers.CreateMessageAsnycTasks(
+			int(requestContext.Chatroom.ID),
+			messageID,
+			createMessageRequest.ShouldStreamChatbotResponse,
+			apiVersionInt,
+		)
+	})
 
 	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, createMessageModelInstance)
 }

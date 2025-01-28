@@ -10,6 +10,7 @@ import (
 	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/api/utilities"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/external"
 	"log"
 	"regexp"
 	"slices"
@@ -354,6 +355,32 @@ func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, create
 	psResponse.RawData = string(createMessageResponseBytes)
 
 	return *psResponse
+}
+
+func CreateMessageAsnycTasks(
+	chatroomId int,
+	messageID int,
+	shouldStreamChatbotResponse bool,
+	apiVersion int,
+) {
+	utilities.SafeGo(func() { createMessageAsnycTasksInCaravan() })
+	utilities.SafeGo(func() { triggerChatbotInCaravan(chatroomId, messageID, shouldStreamChatbotResponse, apiVersion) })
+}
+
+func createMessageAsnycTasksInCaravan() {
+
+}
+
+func triggerChatbotInCaravan(chatroomId int, messageID int, shouldStreamChatbotResponse bool, apiVersion int) {
+	requestPostBody := &requestresponse.TriggerChatbot{
+		ChatroomID:                  chatroomId,
+		MessageID:                   messageID,
+		ShouldStreamChatbotResponse: shouldStreamChatbotResponse,
+		ApiVersion:                  apiVersion,
+	}
+	enpoint := external.EndpointTriggerChatbot
+
+	external.NewAPIClientCaravan().Post(enpoint, requestPostBody)
 }
 
 func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, createMessageModelInstance *models.Message) {
