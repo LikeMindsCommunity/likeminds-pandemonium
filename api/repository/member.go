@@ -29,7 +29,7 @@ func GetMemberStateInCommunity(communityID int, userID int) (*int, error) {
 
 	err := NewMemberRepository().memberDatabase.Model(&models.Member{}).Select("state").Where(filter).First(&memberState).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get member state in community, community id=%d, user id=%d, err=%s", communityID, userID, err)
 	}
 
 	return &memberState, nil

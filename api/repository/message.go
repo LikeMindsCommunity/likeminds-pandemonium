@@ -29,7 +29,7 @@ func GetMessageByID(ID string) (*models.Message, error) {
 
 	err := NewMessageRepository().messageDatabase.Where(filter).First(&message).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get message, message id=%s, err=%s", ID, err)
 	}
 
 	return message, nil
