@@ -25,7 +25,7 @@ type CreateMessageRequestContext struct {
 	OriginalMessage models.Message   `json:"original_message"`
 }
 
-func ValidateCreateMessageRequest(createMessageRequest requestresponse.CreateMessageRequest, userID string, deviceID string, topic string) (*CreateMessageRequestContext, *constant.APIError) {
+func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, userID string, deviceID string, topic string) (*CreateMessageRequestContext, *constant.APIError) {
 
 	createMessageRequestContext := &CreateMessageRequestContext{}
 
@@ -64,7 +64,7 @@ func ValidateCreateMessageRequest(createMessageRequest requestresponse.CreateMes
 		createMessageRequestContext.OriginalMessage = *originalMessage
 	}
 
-	if createMessageRequest.State == int32(constant.ConversationStateConversationPoll) {
+	if createMessageRequest.State == int32(constant.MessageStateMessagePoll) {
 		err := validateCreatePollMessageRequest(createMessageRequest, community.ID)
 		if err != nil {
 			return nil, constant.APIErrorBadRequest(errors.New("failed to validate create poll message request"))
@@ -83,7 +83,7 @@ func GetMessageByID(messageID float64) (*models.Message, error) {
 	return message, nil
 }
 
-func validateCreatePollMessageRequest(createMessageRequest requestresponse.CreateMessageRequest, communityID int64) error {
+func validateCreatePollMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, communityID int64) error {
 	communityConfigurationChatPollDefault := &constant.CommunityConfiguration{}
 	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationChatPoll)
 	if err != nil && err.Error() != "record not found" {
@@ -94,18 +94,9 @@ func validateCreatePollMessageRequest(createMessageRequest requestresponse.Creat
 	}
 
 	if communityConfigurationChatPollDefault.Type == constant.CommunityConfigurationChatPoll {
-		if createMessageRequest.PollType == nil {
-			return errors.New("poll_type is missing, required")
-		}
-
-		if createMessageRequest.ExpiryTime == nil && !createMessageRequest.NoPollExpiry {
-			return errors.New("expiry_time is missing, required")
-		}
-
-		var pollType = new(int)
-		*pollType = int(*createMessageRequest.PollType)
-		if *pollType == constant.ConversationPollTypeDeferred && !createMessageRequest.NoPollExpiry {
-			return errors.New("expiry_time is missing, required")
+		err := validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest)
+		if err != nil {
+			return err
 		}
 	} else {
 		communityConfigurationChatPollValue := configuration.Value
@@ -113,6 +104,84 @@ func validateCreatePollMessageRequest(createMessageRequest requestresponse.Creat
 		err := json.Unmarshal([]byte(communityConfigurationChatPollValue), &communityConfigurationValueStruct)
 		if err != nil {
 			return err
+		}
+		err = validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest, &communityConfigurationValueStruct)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest *requestresponse.CreateMessageRequest) error {
+	if createMessageRequest.PollType == nil {
+		return errors.New("poll_type is missing, required")
+	}
+
+	if createMessageRequest.ExpiryTime == nil && !createMessageRequest.NoPollExpiry {
+		return errors.New("expiry_time is missing, required")
+	}
+
+	var pollType = new(int)
+	*pollType = int(*createMessageRequest.PollType)
+	if *pollType == constant.MessagePollTypeDeferred && !createMessageRequest.NoPollExpiry {
+		return errors.New("expiry_time is missing, required")
+	}
+
+	if createMessageRequest.NoPollExpiry {
+		createMessageRequest.ExpiryTime = nil
+	}
+
+	if !createMessageRequest.AllowVoteChange {
+		if *pollType == constant.MessagePollTypeInstant {
+			createMessageRequest.AllowVoteChange = false
+		} else {
+			createMessageRequest.AllowVoteChange = true
+		}
+	}
+
+	return nil
+}
+
+func validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest *requestresponse.CreateMessageRequest, communityConfigurationValueStruct *constant.CommunityConfigurationValue) error {
+	if communityConfigurationValueStruct.AllowOveride {
+		return nil
+	}
+
+	if communityConfigurationValueStruct.PollType != "" {
+		pollTypeInt := constant.GetMessagePollTypeFromEnum(communityConfigurationValueStruct.PollType)
+		var pollTypeInt32 = new(int32)
+		*pollTypeInt32 = int32(pollTypeInt)
+		createMessageRequest.PollType = pollTypeInt32
+	}
+
+	if communityConfigurationValueStruct.MultipleSelectState != "" {
+		multiSelectStateInt := constant.GetMessagePollMultiSelectStateFromEnum(communityConfigurationValueStruct.MultipleSelectState)
+		var multiSelectStateInt64 = new(int64)
+		*multiSelectStateInt64 = int64(multiSelectStateInt)
+		createMessageRequest.MultilpleSelectState = multiSelectStateInt64
+
+	}
+
+	var multilpleSelectNoDefault = new(int64)
+	*multilpleSelectNoDefault = int64(1)
+	if createMessageRequest.MultilpleSelectNo = multilpleSelectNoDefault; communityConfigurationValueStruct.MultipleSelectNo != 0 {
+		var multilpleSelectNo = new(int64)
+		*multilpleSelectNo = int64(communityConfigurationValueStruct.MultipleSelectNo)
+		createMessageRequest.MultilpleSelectNo = multilpleSelectNo
+	}
+
+	createMessageRequest.IsAnonymous = communityConfigurationValueStruct.IsAnonymous
+	createMessageRequest.AllowAddOption = communityConfigurationValueStruct.AllowAddOption
+	createMessageRequest.NoPollExpiry = communityConfigurationValueStruct.NoPollExpiry
+	createMessageRequest.AllowVoteChange = communityConfigurationValueStruct.AllowVoteChange
+
+	if createMessageRequest.NoPollExpiry {
+		createMessageRequest.ExpiryTime = nil
+	} else {
+		if createMessageRequest.ExpiryTime == nil {
+			return errors.New("expiry_time missing, required")
 		}
 	}
 
@@ -138,7 +207,7 @@ func ValidateCreateMessagePermission(createMessageRequest *requestresponse.Creat
 		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightRespondInRoomEnum))
 	}
 
-	if createMessageRequest.State == int32(constant.ConversationStateConversationPoll) &&
+	if createMessageRequest.State == int32(constant.MessageStateMessagePoll) &&
 		!ValidateUserRight(chatroom.CommunityID, userIDInt, constant.MemberRightCreatePoll, int(chatroom.ID)) {
 		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightCreatePollEnum))
 	}
@@ -171,17 +240,24 @@ func FillCreateMessageModelInstance(
 
 	createMessageModelInstance.Answer = createMessageRequest.Text
 	createMessageModelInstance.APIVersion = 1
+
+	createMessageModelInstance.HasFiles = createMessageRequest.HasFiles
 	createMessageModelInstance.AttachmentCount = int(createMessageRequest.AttachmentCount)
 	createMessageModelInstance.AttachmentsUploaded = false
+	if createMessageModelInstance.AttachmentCount > 0 {
+		createMessageRequest.HasFiles = true
+		createMessageModelInstance.HasFiles = true
+	}
+
 	createMessageModelInstance.CardID = int(requestContext.Chatroom.ID)
 	createMessageModelInstance.CommunityID = int(requestContext.Community.ID)
 	createMessageModelInstance.CreatedAt = time.Now().Unix()
 	createMessageModelInstance.DeviceID = &deviceID
-	createMessageModelInstance.HasFiles = createMessageRequest.HasFiles
 	createMessageModelInstance.IsGuest = isGuest
 	createMessageModelInstance.TemporaryID = &createMessageRequest.TemporaryID
 	createMessageModelInstance.UserID = int(requestContext.UserInfo.UserID)
 	createMessageModelInstance.Platform = &platformCode
+	createMessageRequest.RepliedConversationId = requestContext.OriginalMessage.ID
 
 	if createMessageRequest.OGTags != nil {
 		ogTagsMap := createMessageRequest.OGTags.(map[string]interface{})
@@ -201,14 +277,14 @@ func FillCreateMessageModelInstance(
 		createMessageModelInstance.ReplyChatroomID = &repliedChatroomID
 	}
 
-	if int(createMessageRequest.State) == constant.ConversationStateConversationPoll {
+	if int(createMessageRequest.State) == constant.MessageStateMessagePoll {
 		err := FillCreatePollMessageModelInstance(createMessageModelInstance, createMessageRequest)
 		if err != nil {
 			return constant.APIErrorBadRequest(err)
 		}
 	}
 
-	if int(createMessageRequest.State) == constant.ConversationStateConversationEvent {
+	if int(createMessageRequest.State) == constant.MessageStateMessageEvent {
 		err := FillCreateEventMessageModelInstance(createMessageModelInstance, createMessageRequest)
 		if err != nil {
 			return constant.APIErrorBadRequest(err)
@@ -252,7 +328,7 @@ func FillCreatePollMessageModelInstance(createMessageModelInstance *models.Messa
 
 	createMessageModelInstance.NoPollExpiry = createMessageRequest.NoPollExpiry
 	createMessageModelInstance.AllowVoteChange = createMessageRequest.AllowVoteChange
-	createMessageModelInstance.PollAnswerText = constant.ConversationPollAnswerText
+	createMessageModelInstance.PollAnswerText = constant.MessagePollAnswerText
 
 	return nil
 }
@@ -317,8 +393,27 @@ func FillCreateMessageAttachmentsModelInstances(createMessageAttachmentModelInst
 	return nil
 }
 
-func CreateMessageInDB(createMessageModelInstance *models.Message, createMessageAttachmentModelInstances []models.MessageAttachment) (int, *constant.APIError) {
-	messageID, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances)
+func FillCreateMessagePollModelInstances(createMessagePollsModelInstances *[]models.MessagePoll, createMessageRequestPolls []requestresponse.PollObject, userID int) *constant.APIError {
+	for i := range createMessageRequestPolls {
+		createMessagePollsModelInstance := &models.MessagePoll{}
+		createMessagePollsModelInstance.ConversationID = createMessageRequestPolls[i].ConversationID
+		createMessagePollsModelInstance.UserID = userID
+		createMessagePollsModelInstance.Text = createMessageRequestPolls[i].Text
+		createMessagePollsModelInstance.CreatedAt = time.Now().Unix()
+		createMessagePollsModelInstance.UpdatedAt = time.Now().Unix()
+
+		*createMessagePollsModelInstances = append(*createMessagePollsModelInstances, *createMessagePollsModelInstance)
+	}
+
+	return nil
+}
+
+func CreateMessageInDB(
+	createMessageModelInstance *models.Message,
+	createMessageAttachmentModelInstances []models.MessageAttachment,
+	createMessagePollModelInstances []models.MessagePoll,
+) (int, *constant.APIError) {
+	messageID, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances, createMessagePollModelInstances)
 	if err != nil {
 		return 0, constant.APIErrorInternalServerError(err)
 	}

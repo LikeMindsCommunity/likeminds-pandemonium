@@ -33,7 +33,11 @@ func GetMessageByID(ID string) (*models.Message, error) {
 	return message, nil
 }
 
-func CreateMessage(createMessageModelInstance *models.Message, createMessageAttachmentModelInstances []models.MessageAttachment) (int, error) {
+func CreateMessage(
+	createMessageModelInstance *models.Message,
+	createMessageAttachmentModelInstances []models.MessageAttachment,
+	createMessagePollModelInstances []models.MessagePoll,
+) (int, error) {
 	messageID := int64(0)
 
 	tx := NewMessageRepository().messageDatabase.Begin()
@@ -61,6 +65,24 @@ func CreateMessage(createMessageModelInstance *models.Message, createMessageAtta
 			return 0, errors.New("failed to create all message attachments in database, rollingback")
 		}
 	}
+
+	if len(createMessagePollModelInstances) > 0 {
+		createMessagePollModelInstances, err := updatePollsWithMessageID(createMessagePollModelInstances, int(messageID))
+		if err != nil {
+			tx.Rollback()
+			return 0, errors.New("failed to attach messageID to polls, rollingback")
+		}
+		polls := tx.Create(createMessagePollModelInstances)
+		if polls.Error != nil {
+			tx.Rollback()
+			return 0, errors.New("failed to create message polls in database, rollingback")
+		}
+		if int(polls.RowsAffected) != len(createMessagePollModelInstances) {
+			tx.Rollback()
+			return 0, errors.New("failed to create all message attachments in database, rollingback")
+		}
+	}
+
 	tx.Commit()
 
 	return int(messageID), nil
@@ -71,4 +93,11 @@ func updateAttachmentsWithMessageID(createMessageAttachmentModelInstances []mode
 		createMessageAttachmentModelInstances[i].AnswerID = messageID
 	}
 	return createMessageAttachmentModelInstances, nil
+}
+
+func updatePollsWithMessageID(createMessagePollModelInstances []models.MessagePoll, messageID int) ([]models.MessagePoll, error) {
+	for i := range createMessagePollModelInstances {
+		createMessagePollModelInstances[i].ConversationID = messageID
+	}
+	return createMessagePollModelInstances, nil
 }

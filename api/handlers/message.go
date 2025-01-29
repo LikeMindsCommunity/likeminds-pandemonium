@@ -35,7 +35,7 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	requestContext, apiError := helpers.ValidateCreateMessageRequest(createMessageRequest, userID, deviceID, topic)
+	requestContext, apiError := helpers.ValidateCreateMessageRequest(&createMessageRequest, userID, deviceID, topic)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
@@ -74,7 +74,13 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	messageID, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances)
+	createMessagePollModelInstances := &[]models.MessagePoll{}
+	apiError = helpers.FillCreateMessagePollModelInstances(createMessagePollModelInstances, createMessageRequest.Polls, requestContext.UserInfo.UserID)
+	if apiError != nil {
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+	}
+
+	messageID, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances, *createMessagePollModelInstances)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}

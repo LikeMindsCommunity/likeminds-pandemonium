@@ -51,7 +51,9 @@ type CreateMessageResponse struct {
 }
 
 type PollObject struct {
-	Text string `json:"text"`
+	Text           string `json:"text"`
+	ConversationID int    `json:"conversation_id"`
+	UserID         int    `json:"user_id"`
 }
 
 type ConversationPreview struct {
