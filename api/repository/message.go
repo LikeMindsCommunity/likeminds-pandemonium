@@ -4,6 +4,7 @@ import (
 	"errors"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -81,6 +82,16 @@ func CreateMessage(
 			tx.Rollback()
 			return 0, errors.New("failed to create all message attachments in database, rollingback")
 		}
+	}
+
+	chatroom := tx.Model(&models.Chatroom{}).Where("id = ?", createMessageModelInstance.CardID).Update("updated_at", time.Now().Unix())
+	if chatroom.Error != nil {
+		tx.Rollback()
+		return 0, errors.New("failed to update chatroom in database, rollingback")
+	}
+	if int(chatroom.RowsAffected) != 1 {
+		tx.Rollback()
+		return 0, errors.New("failed to update chatroom in database, rollingback")
 	}
 
 	tx.Commit()
