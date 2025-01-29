@@ -1,10 +1,10 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
-	"log"
 
 	"gorm.io/gorm"
 )
@@ -35,7 +35,7 @@ func GetMemberStateInCommunity(communityID int, userID int) (*int, error) {
 	return &memberState, nil
 }
 
-func IsMemberVerifiedInCommunity(communityID int, userID int) bool {
+func IsMemberVerifiedInCommunity(communityID int, userID int) (bool, error) {
 	member := &models.Member{}
 	filter := map[string]interface{}{
 		"community_id_id": communityID,
@@ -49,15 +49,8 @@ func IsMemberVerifiedInCommunity(communityID int, userID int) bool {
 
 	err := NewMemberRepository().memberDatabase.Where(filter).First(&member).Error
 	if err != nil {
-		log.Print("error fetching member")
-		return false
+		return false, fmt.Errorf("failed to verify member in community, community id=%d, user id=%d, err=%s", communityID, userID, err)
 	}
 
-	// if row id is default value
-	if member.ID == 0 {
-		log.Print("member response error")
-		return false
-	}
-
-	return true
+	return true, nil
 }

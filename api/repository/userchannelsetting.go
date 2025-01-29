@@ -1,9 +1,9 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
-	"log"
 
 	"gorm.io/gorm"
 )
@@ -18,7 +18,7 @@ func NewUserChannelSettingRepository() *UserChannelSettingRepository {
 	}
 }
 
-func UserHasRightInChatroom(chatroomID int, userID int, userRight string) bool {
+func UserHasRightInChatroom(chatroomID int, userID int, userRight string) (bool, error) {
 	userHasRightInChatroom := &models.UserChannelSetting{}
 	filter := map[string]interface{}{
 		"chatroom_id":  chatroomID,
@@ -28,9 +28,8 @@ func UserHasRightInChatroom(chatroomID int, userID int, userRight string) bool {
 
 	userRightInChatroom := NewUserChannelSettingRepository().userChannelSettingDatabase.Where(filter).First(&userHasRightInChatroom)
 	if userRightInChatroom.Error != nil {
-		log.Print("error fetching user channel settings")
-		return false
+		return false, fmt.Errorf("failed to validate chatroom user right, chatroom id=%d, userId=%d, user right=%s, err=%s", chatroomID, userID, userRight, userRightInChatroom.Error)
 	}
 
-	return userHasRightInChatroom.Enabled
+	return userHasRightInChatroom.Enabled, nil
 }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
 
@@ -26,7 +27,7 @@ func GetUserInfoByUUID(uuid string) (*models.UserInfo, error) {
 
 	err := NewUserInfoRepository().userInfoDatabase.Where(filter).First(&userInfo).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get user info, user id=%s, err=%s", uuid, err)
 	}
 
 	return userInfo, nil

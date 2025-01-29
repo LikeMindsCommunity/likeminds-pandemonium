@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
 
@@ -17,7 +18,7 @@ func NewChatroomRepository() *ChatroomRepository {
 	}
 }
 
-func GetChatroomByID(ID string) (*models.Chatroom, error) {
+func GetChatroomByID(ID int64) (*models.Chatroom, error) {
 	chatroom := &models.Chatroom{}
 
 	filter := map[string]interface{}{
@@ -26,7 +27,7 @@ func GetChatroomByID(ID string) (*models.Chatroom, error) {
 
 	err := NewChatroomRepository().chatroomDatabase.Where(filter).First(&chatroom).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get chatroom, id=%d, err=%s", ID, err)
 	}
 
 	return chatroom, nil

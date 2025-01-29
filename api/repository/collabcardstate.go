@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
 
@@ -27,7 +28,7 @@ func GetUserCollabcardStateForChatroom(chatroomID int, userID int) (*models.Coll
 
 	err := NewCollabcardStateRepository().collabcardStateDatabase.Where(filter).First(&collabcardState).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get collabcard state, chatroom id=%d, user id=%d, err=%s", chatroomID, userID, err)
 	}
 
 	return collabcardState, nil

@@ -1,9 +1,9 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
-	"log"
 
 	"gorm.io/gorm"
 )
@@ -18,7 +18,7 @@ func NewUserMemberRightRepository() *UserMemberRightRepository {
 	}
 }
 
-func UserHasRightInCommunity(communityID int, userID int, rightID int) bool {
+func UserHasRightInCommunity(communityID int, userID int, rightID int) (bool, error) {
 	userHasRightInCommunity := &models.UserMemberRight{}
 	filter := map[string]interface{}{
 		"community_id": communityID,
@@ -28,15 +28,8 @@ func UserHasRightInCommunity(communityID int, userID int, rightID int) bool {
 
 	err := NewUserMemberRightRepository().userMemberRightDatabase.Where(filter).First(&userHasRightInCommunity).Error
 	if err != nil {
-		log.Print("error fetching user member rights")
-		return false
+		return false, fmt.Errorf("failed to validate community user right, community id=%d, user id=%d, right id=%d, err=%s", communityID, userID, rightID, err)
 	}
 
-	// if row id is default value
-	if userHasRightInCommunity.ID == 0 {
-		log.Print("user member rights response error")
-		return false
-	}
-
-	return true
+	return true, nil
 }

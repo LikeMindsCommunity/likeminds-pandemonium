@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
 	"time"
@@ -38,28 +39,27 @@ func CreateMessage(
 	createMessageModelInstance *models.Message,
 	createMessageAttachmentModelInstances []models.MessageAttachment,
 	createMessagePollModelInstances []models.MessagePoll,
-) (int, error) {
-	messageID := int64(0)
+) (int64, error) {
 
 	tx := NewMessageRepository().messageDatabase.Begin()
 
 	message := tx.Create(createMessageModelInstance)
 	if message.Error != nil {
 		tx.Rollback()
-		return 0, errors.New("failed to create message in database, rollingback")
+		return 0, fmt.Errorf("failed to create message in database, rollingback, err=%s", message.Error)
 	}
-	messageID = createMessageModelInstance.ID
+	messageID := createMessageModelInstance.ID
 
 	if len(createMessageAttachmentModelInstances) > 0 {
 		createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))
 		if err != nil {
 			tx.Rollback()
-			return 0, errors.New("failed to attach messageID to attachments, rollingback")
+			return 0, fmt.Errorf("failed to attach messageID to attachments, rollingback, err=%s", err)
 		}
 		attachments := tx.Create(createMessageAttachmentModelInstances)
 		if attachments.Error != nil {
 			tx.Rollback()
-			return 0, errors.New("failed to create message attachments in database, rollingback")
+			return 0, fmt.Errorf("failed to create message attachments in database, rollingback, err=%s", attachments.Error)
 		}
 		if int(attachments.RowsAffected) != len(createMessageAttachmentModelInstances) {
 			tx.Rollback()
@@ -71,23 +71,23 @@ func CreateMessage(
 		createMessagePollModelInstances, err := updatePollsWithMessageID(createMessagePollModelInstances, int(messageID))
 		if err != nil {
 			tx.Rollback()
-			return 0, errors.New("failed to attach messageID to polls, rollingback")
+			return 0, fmt.Errorf("failed to attach messageID to polls, rollingback, err=%s", err)
 		}
 		polls := tx.Create(createMessagePollModelInstances)
 		if polls.Error != nil {
 			tx.Rollback()
-			return 0, errors.New("failed to create message polls in database, rollingback")
+			return 0, fmt.Errorf("failed to create message polls in database, rollingback, err=%s", polls.Error)
 		}
 		if int(polls.RowsAffected) != len(createMessagePollModelInstances) {
 			tx.Rollback()
-			return 0, errors.New("failed to create all message attachments in database, rollingback")
+			return 0, errors.New("failed to create all message polls in database, rollingback")
 		}
 	}
 
 	chatroom := tx.Model(&models.Chatroom{}).Where("id = ?", createMessageModelInstance.CardID).Update("updated_at", time.Now().Unix())
 	if chatroom.Error != nil {
 		tx.Rollback()
-		return 0, errors.New("failed to update chatroom in database, rollingback")
+		return 0, fmt.Errorf("failed to update chatroom in database, rollingback, err=%s", chatroom.Error)
 	}
 	if int(chatroom.RowsAffected) != 1 {
 		tx.Rollback()
@@ -96,7 +96,7 @@ func CreateMessage(
 
 	tx.Commit()
 
-	return int(messageID), nil
+	return messageID, nil
 }
 
 func updateAttachmentsWithMessageID(createMessageAttachmentModelInstances []models.MessageAttachment, messageID int) ([]models.MessageAttachment, error) {

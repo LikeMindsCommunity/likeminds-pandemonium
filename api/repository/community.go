@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"likeminds-pandemonium/api/models"
 	"likeminds-pandemonium/database"
 
@@ -17,7 +18,7 @@ func NewCommunityRepository() *CommunityRepository {
 	}
 }
 
-func GetCommunityByID(ID int) (*models.Community, error) {
+func GetCommunityByID(ID int64) (*models.Community, error) {
 	community := &models.Community{}
 
 	filter := map[string]interface{}{
@@ -26,7 +27,7 @@ func GetCommunityByID(ID int) (*models.Community, error) {
 
 	err := NewCommunityRepository().communityDatabase.Where(filter).First(&community).Error
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get community, id=%d, err=%s", ID, err)
 	}
 
 	return community, nil

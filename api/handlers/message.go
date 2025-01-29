@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/api/helpers"
 	"likeminds-pandemonium/api/models"
@@ -25,13 +25,13 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 
 	CreateMessageData, err := json.Marshal(messageData["data"])
 	if err != nil {
-		var apiError = constant.APIErrorBadRequest(errors.New(common.ErrorMarshalErrorJson))
+		var apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to marshal create message json data, err=%s", err))
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
 	var createMessageRequest requestresponse.CreateMessageRequest
 	if err := json.Unmarshal(CreateMessageData, &createMessageRequest); err != nil {
-		var apiError = constant.APIErrorBadRequest(errors.New(common.ErrorMarshalErrorJson))
+		var apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to unmarshal create message request, err=%s", err))
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
@@ -39,7 +39,6 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
-	log.Print(requestContext)
 
 	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, &requestContext.Chatroom, requestContext.UserInfo.UserID)
 	if apiError != nil {
@@ -48,17 +47,22 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 
 	collabcardState, err := helpers.GetUserCollabcardStateForChatroom(int(requestContext.Chatroom.ID), requestContext.UserInfo.UserID)
 	if err != nil {
-		log.Print(err)
+		log.Printf("failed to get collabcard state, chatroom=%d, user=%d", requestContext.Chatroom.ID, requestContext.UserInfo.UserID)
 	}
 
 	if collabcardState.ID != 0 {
 		// TODO: add m2cm v2 check
 	}
 
+	isMemberVerifiedInCommunity, err := helpers.IsMemberVerifiedInCommunity(int(requestContext.Community.ID), int(requestContext.UserInfo.UserID))
+	if err != nil {
+		log.Printf("failed to verify member in community, community id=%d, user id=%d, err=%s", requestContext.Community.ID, requestContext.UserInfo.UserID, err)
+	}
+
 	var isGuest bool
 	if requestContext.Chatroom.AccessWithoutSubscription &&
 		collabcardState.ID == 0 &&
-		!helpers.IsMemberVerifiedInCommunity(int(requestContext.Community.ID), int(requestContext.UserInfo.ID)) {
+		!isMemberVerifiedInCommunity {
 		isGuest = true
 	}
 
@@ -84,11 +88,11 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
-	log.Printf("created_message id=%d", messageID)
+	log.Printf("created message, id=%d", messageID)
 
 	apiVersionInt, err := strconv.Atoi(apiVersion)
 	if err != nil {
-		log.Print(err)
+		log.Printf("failed to convert api_version to integer, err=%s", err)
 	}
 
 	utilities.SafeGo(func() {
