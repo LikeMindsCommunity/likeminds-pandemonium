@@ -56,7 +56,7 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 	}
 	createMessageRequestContext.Community = *community
 
-	if createMessageRequest.RepliedConversationId != "" {
+	if createMessageRequest.RepliedConversationId != nil {
 		originalMessage, err := GetMessageByID(createMessageRequest.RepliedConversationId.(float64))
 		if err != nil {
 			return nil, constant.APIErrorBadRequest(errors.New(common.ErrorRepliedMessageNotFound))
@@ -203,12 +203,16 @@ func ValidateCreateMessagePermission(createMessageRequest *requestresponse.Creat
 		return constant.APIErrorForbidden(errors.New("invalid message group tags"))
 	}
 
-	if !ValidateUserRight(chatroom.CommunityID, userIDInt, constant.MemberRightRespondInRoom, int(chatroom.ID)) {
+	if !ValidateUserRightInCommunity(chatroom.CommunityID, userIDInt, constant.MemberRightRespondInRoom) {
 		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightRespondInRoomEnum))
 	}
 
+	if !ValidateUserRightInChatroom(int(chatroom.ID), userIDInt, constant.UserChannelSettingChatroomMemberCanMessage, isMemberAdminInCommunity) {
+		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.UserChannelSettingChatroomMemberCanMessage))
+	}
+
 	if createMessageRequest.State == int32(constant.MessageStateMessagePoll) &&
-		!ValidateUserRight(chatroom.CommunityID, userIDInt, constant.MemberRightCreatePoll, int(chatroom.ID)) {
+		!ValidateUserRightInCommunity(chatroom.CommunityID, userIDInt, constant.MemberRightCreatePoll) {
 		return constant.APIErrorForbidden(fmt.Errorf("user right missing, right=%s", constant.MemberRightCreatePollEnum))
 	}
 

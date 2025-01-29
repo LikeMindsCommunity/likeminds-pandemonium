@@ -23,7 +23,7 @@ func UserHasRightInCommunity(communityID int, userID int, rightID int) bool {
 	filter := map[string]interface{}{
 		"community_id": communityID,
 		"user_id":      userID,
-		"state":        rightID,
+		"right_id":     rightID,
 	}
 
 	err := NewUserMemberRightRepository().userMemberRightDatabase.Where(filter).First(&userHasRightInCommunity).Error

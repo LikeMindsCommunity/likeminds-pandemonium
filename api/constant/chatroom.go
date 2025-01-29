@@ -27,3 +27,7 @@ const (
 	ChatroomTypeDirectMessageEnum = "direct_message"
 	ChatroomTypeFeedGroupEnum     = "feed_group"
 )
+
+const (
+	UserChannelSettingChatroomMemberCanMessage = "member_can_message"
+)

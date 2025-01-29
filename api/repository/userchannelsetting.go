@@ -18,24 +18,19 @@ func NewUserChannelSettingRepository() *UserChannelSettingRepository {
 	}
 }
 
-func UserHasRightInChatroom(chatroomID int, userID int) bool {
+func UserHasRightInChatroom(chatroomID int, userID int, userRight string) bool {
 	userHasRightInChatroom := &models.UserChannelSetting{}
 	filter := map[string]interface{}{
-		"chatroom_id": chatroomID,
-		"user_id":     userID,
+		"chatroom_id":  chatroomID,
+		"user_id":      userID,
+		"setting_type": userRight,
 	}
 
-	err := NewUserChannelSettingRepository().userChannelSettingDatabase.Where(filter).First(&userHasRightInChatroom).Error
-	if err != nil {
+	userRightInChatroom := NewUserChannelSettingRepository().userChannelSettingDatabase.Where(filter).First(&userHasRightInChatroom)
+	if userRightInChatroom.Error != nil {
 		log.Print("error fetching user channel settings")
 		return false
 	}
 
-	// if row id is default value
-	if userHasRightInChatroom.ID == 0 {
-		log.Print("user channel settings response error")
-		return false
-	}
-
-	return true
+	return userHasRightInChatroom.Enabled
 }
