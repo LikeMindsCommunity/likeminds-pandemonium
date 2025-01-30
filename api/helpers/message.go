@@ -20,6 +20,7 @@ type CreateMessageRequestContext struct {
 	UserInfo        models.UserInfo  `json:"userinfo"`
 	Chatroom        models.Chatroom  `json:"chatroom"`
 	Community       models.Community `json:"community"`
+	MemberState     int              `json:"member_state"`
 	OriginalMessage models.Message   `json:"original_message"`
 }
 
@@ -59,6 +60,12 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get community, community id=%d, err=%s", chatroom.CommunityID, err))
 	}
 	createMessageRequestContext.Community = *community
+
+	memberState, err := GetMemberStateInCommunity(chatroom.CommunityID, userinfo.UserID)
+	if err != nil {
+		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get member state in community, community id=%d, userId=%d, err=%s", chatroom.CommunityID, userinfo.UserID, err))
+	}
+	createMessageRequestContext.MemberState = *memberState
 
 	if createMessageRequest.RepliedConversationId != nil {
 		originalMessage, err := GetMessageByID(createMessageRequest.RepliedConversationId.(float64))
@@ -193,22 +200,17 @@ func validateCreatePollMessageCustomerCommunityConfiguration(createMessageReques
 	return nil
 }
 
-func ValidateCreateMessagePermission(createMessageRequest *requestresponse.CreateMessageRequest, chatroom *models.Chatroom, userIDInt int) *constant.APIError {
+func ValidateCreateMessagePermission(createMessageRequest *requestresponse.CreateMessageRequest, chatroom *models.Chatroom, userIDInt int, memberState int) *constant.APIError {
 	if chatroom.Type == constant.ChatroomTypeMasterIntro {
 		return constant.APIErrorForbidden(fmt.Errorf("failed to post in chatroom, type=%s", constant.ChatroomTypeMasterIntroEnum))
 	}
 
-	memberState, err := GetMemberStateInCommunity(chatroom.CommunityID, userIDInt)
-	if err != nil {
-		return constant.APIErrorForbidden(fmt.Errorf("failed to get member state in community, community id=%d, userId=%d, err=%s", chatroom.CommunityID, userIDInt, err))
-	}
-
-	isMemberAdminInCommunity := IsMemberStateAdminInCommunity(memberState)
+	isMemberAdminInCommunity := IsMemberStateAdminInCommunity(&memberState)
 	if !validateMessageGroupTags(createMessageRequest.Text, chatroom.IsSecret, chatroom.UserID, isMemberAdminInCommunity, userIDInt) {
 		return constant.APIErrorForbidden(fmt.Errorf("invalid group tags in message, text=%s", createMessageRequest.Text))
 	}
 
-	_, err = ValidateUserRightInCommunity(chatroom.CommunityID, userIDInt, constant.MemberRightRespondInRoom)
+	_, err := ValidateUserRightInCommunity(chatroom.CommunityID, userIDInt, constant.MemberRightRespondInRoom)
 	if err != nil {
 		return constant.APIErrorForbidden(fmt.Errorf("user right missing in community, community id=%d, user id=%d, right=%s", chatroom.CommunityID, userIDInt, constant.MemberRightRespondInRoomEnum))
 	}
@@ -464,28 +466,25 @@ func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, create
 	return *psResponse
 }
 
-func CreateMessageAsnycTasks(
+func CreateMessageCaravanTasks(
 	chatroomId int,
-	messageID int64,
-	shouldStreamChatbotResponse bool,
+	messageID int,
 	apiVersion int,
+	chatroomStateID int,
+	userID int,
+	memberState int,
+	createMessageRequest *requestresponse.CreateMessageRequest,
 ) {
-	utilities.SafeGo(func() { createMessageAsnycTasksInCaravan() })
-	utilities.SafeGo(func() { triggerChatbotInCaravan(chatroomId, messageID, shouldStreamChatbotResponse, apiVersion) })
-}
-
-func createMessageAsnycTasksInCaravan() {
-	// TODO: send async task to caravan
-}
-
-func triggerChatbotInCaravan(chatroomId int, messageID int64, shouldStreamChatbotResponse bool, apiVersion int) {
-	requestPostBody := &requestresponse.TriggerChatbot{
-		ChatroomID:                  chatroomId,
-		MessageID:                   messageID,
-		ShouldStreamChatbotResponse: shouldStreamChatbotResponse,
-		ApiVersion:                  apiVersion,
+	requestPostBody := &requestresponse.CreateMessageCaravanTask{
+		ApiVersion:      apiVersion,
+		ChatroomID:      chatroomId,
+		ChatroomStateID: chatroomStateID,
+		MemberState:     memberState,
+		MessageID:       messageID,
+		RequestBody:     createMessageRequest,
+		UserID:          userID,
 	}
-	enpoint := external.EndpointTriggerChatbot
+	enpoint := external.EnpointCreateMessageCaravanTasks
 
 	external.NewAPIClientCaravan().Post(enpoint, requestPostBody)
 }

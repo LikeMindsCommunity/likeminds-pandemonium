@@ -40,7 +40,7 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, &requestContext.Chatroom, requestContext.UserInfo.UserID)
+	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, &requestContext.Chatroom, requestContext.UserInfo.UserID, requestContext.MemberState)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
@@ -96,11 +96,14 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 	}
 
 	utilities.SafeGo(func() {
-		helpers.CreateMessageAsnycTasks(
+		helpers.CreateMessageCaravanTasks(
 			int(requestContext.Chatroom.ID),
-			messageID,
-			createMessageRequest.ShouldStreamChatbotResponse,
+			int(messageID),
 			apiVersionInt,
+			collabcardState.ID,
+			requestContext.UserInfo.UserID,
+			requestContext.MemberState,
+			&createMessageRequest,
 		)
 	})
 
