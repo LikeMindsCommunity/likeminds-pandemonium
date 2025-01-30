@@ -77,7 +77,7 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 			return nil, constant.APIErrorInternalServerError(fmt.Errorf("failed to validate create widget message request, err=%s", err))
 		}
 		if !validateCreateWidgetMessageRequest {
-			return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to validate create widget message request, err=%s", err))
+			return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to validate create widget message request"))
 		}
 		createMessageRequestContext.CreateWidget = true
 	}
@@ -117,10 +117,7 @@ func GetMessageByID(messageID float64) (*models.Message, error) {
 
 func validateCreatePollMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, communityID int64) error {
 	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationChatPollEnum)
-	if err != nil && err.Error() != "record not found" {
-		log.Printf("failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPollEnum, err)
-	}
-	if err != nil && err.Error() == "record not found" {
+	if err != nil {
 		log.Printf("using default, failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPollEnum, err)
 		err := validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest)
 		if err != nil {
@@ -218,10 +215,7 @@ func validateCreatePollMessageCustomerCommunityConfiguration(createMessageReques
 
 func validateCreateWidgetMessageRequest(communityID int) (bool, error) {
 	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationWidgetMetadataEnum)
-	if err != nil && err.Error() != "record not found" {
-		log.Printf("failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationFeedMetaDataEnum, err)
-	}
-	if err != nil && err.Error() == "record not found" {
+	if err != nil {
 		log.Printf("using default, failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationFeedMetaDataEnum, err)
 		return constant.CommunityConfigurationWidgetMetadataDefault.Value.(constant.CommunityConfigurationWidgetMetadataValue).Message, nil
 	} else {
@@ -466,10 +460,10 @@ func GetSwarmCreateWidgetRequest(
 	widgetData interface{},
 ) (*requestresponse.SwarmCreateWidgetRequest, *constant.APIError) {
 
-	swarmRequestHeaders := &requestresponse.SwarmRequestHeaders{
-		MemberID:     UUID,
-		APIKey:       apiKey,
-		PlatformType: constant.PlatformTypePandemoniumService,
+	swarmRequestHeaders := &constant.ApiHeaders{
+		HeadersMemberID:     UUID,
+		HeadersApiKey:       apiKey,
+		HeadersPlatformType: constant.PlatformTypePandemoniumService,
 	}
 
 	swarmCreateWidgetRequestBody := &requestresponse.SwarmCreateWidgetRequestBody{

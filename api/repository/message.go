@@ -6,6 +6,8 @@ import (
 	"likeminds-pandemonium/api/models"
 	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/database"
+	"likeminds-pandemonium/external"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -53,14 +55,23 @@ func CreateMessage(
 	messageID := createMessageModelInstance.ID
 
 	if swarmCreateWidgetRequest != nil {
-		// TODO:
-		// 1. update swarm widget request with above message id
-		// 2. send request to swarm
-		// 3. err -> rollback transaction
-		// 4. success -> retrieve widget id and update message with widget id
+		swarmCreateWidgetRequest.RequestBody.ParentEntityID = strconv.Itoa(int(messageID))
+		swarmResponse, err := external.NewAPIClientSwarm().Post(external.EnpointSwarmCreateWidget, swarmCreateWidgetRequest.Headers, swarmCreateWidgetRequest.RequestBody)
+		if err != nil {
+			tx.Rollback()
+			return 0, fmt.Errorf("failed to create widget in swarm, rollingback, err=%s", err)
+		}
+		widgetID := swarmResponse.Data["widget"].(map[string]interface{})["_id"]
+		message := tx.Model(&models.Message{}).Where("id = ?", messageID).Update("widget_id", widgetID)
+		if message.Error != nil {
+			tx.Rollback()
+			return 0, fmt.Errorf("failed to update message widget in database, rollingback, err=%s", message.Error)
+		}
+		if int(message.RowsAffected) != 1 {
+			tx.Rollback()
+			return 0, errors.New("failed to update message widget in database, rollingback")
+		}
 	}
-
-	tx.Rollback()
 
 	if len(createMessageAttachmentModelInstances) > 0 {
 		createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))
