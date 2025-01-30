@@ -91,3 +91,7 @@ func GetMessagePollMultiSelectStateFromEnum(multiSelectState string) int {
 
 	return -1
 }
+
+const (
+	MessageWidgetTypeMessageEnum = "message"
+)

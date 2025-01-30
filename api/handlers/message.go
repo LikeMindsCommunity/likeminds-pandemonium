@@ -13,7 +13,7 @@ import (
 	"strconv"
 )
 
-func CreateMessage(messageData map[string]interface{}, userID string, deviceID string, topic string, platformCode string, versionCode string, apiVersion string) requestresponse.PSResponse {
+func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, platformCode string, versionCode string, apiVersion string) requestresponse.PSResponse {
 
 	psResponse := &requestresponse.PSResponse{
 		DeviceID:         deviceID,
@@ -35,7 +35,7 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	requestContext, apiError := helpers.ValidateCreateMessageRequest(&createMessageRequest, userID, deviceID, topic)
+	requestContext, apiError := helpers.ValidateCreateMessageRequest(&createMessageRequest, UUID, apiKey, deviceID, topic)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
@@ -84,7 +84,15 @@ func CreateMessage(messageData map[string]interface{}, userID string, deviceID s
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	messageID, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances, *createMessagePollModelInstances)
+	var swarmCreateWidgetRequest *requestresponse.SwarmCreateWidgetRequest
+	if requestContext.CreateWidget {
+		swarmCreateWidgetRequest, apiError = helpers.GetSwarmCreateWidgetRequest(UUID, apiKey, int(requestContext.Community.ID), constant.MessageWidgetTypeMessageEnum, createMessageRequest.Metadata)
+		if apiError != nil {
+			return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		}
+	}
+
+	messageID, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances, *createMessagePollModelInstances, swarmCreateWidgetRequest)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}

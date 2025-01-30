@@ -22,20 +22,21 @@ type CreateMessageRequestContext struct {
 	Community       models.Community `json:"community"`
 	MemberState     int              `json:"member_state"`
 	OriginalMessage models.Message   `json:"original_message"`
+	CreateWidget    bool             `json:"create_widget"`
 }
 
-func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, userID string, deviceID string, topic string) (*CreateMessageRequestContext, *constant.APIError) {
+func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, UUID string, apiKey string, deviceID string, topic string) (*CreateMessageRequestContext, *constant.APIError) {
 
 	createMessageRequestContext := &CreateMessageRequestContext{}
 
 	err := validateWsChatroomID(createMessageRequest.ChatroomID, topic)
 	if err != nil {
-		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to validate ws chatroom id, err=%s", err))
+		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to validate chatroom ws subscribed, err=%s", err))
 	}
 
-	userinfo, err := GetUserInfoByUUID(userID)
+	userinfo, err := GetUserInfoByUUID(UUID)
 	if err != nil {
-		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get user, user id=%s, err=%s", userID, err))
+		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get user, user id=%s, err=%s", UUID, err))
 	}
 	createMessageRequestContext.UserInfo = *userinfo
 
@@ -44,6 +45,15 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get chatroom, chatroom id=%d, err=%s", createMessageRequest.ChatroomID, err))
 	}
 	createMessageRequestContext.Chatroom = *chatroom
+
+	sdkCommunity, err := GetSDKClientByApiKey(apiKey)
+	if err != nil {
+		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get sdk client, err=%s", err))
+	}
+
+	if sdkCommunity.CommunityID != chatroom.CommunityID {
+		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to validate community ws topic subscribed"))
+	}
 
 	if chatroom.IsSecret {
 		validateUserSecretChatroomAccess, err := ValidateUserSecretChatroomAccess([]byte(*chatroom.SecretChatroomParticipants), userinfo.UserID)
@@ -60,6 +70,17 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get community, community id=%d, err=%s", chatroom.CommunityID, err))
 	}
 	createMessageRequestContext.Community = *community
+
+	if createMessageRequest.Metadata != nil {
+		validateCreateWidgetMessageRequest, err := validateCreateWidgetMessageRequest(int(community.ID))
+		if err != nil {
+			return nil, constant.APIErrorInternalServerError(fmt.Errorf("failed to validate create widget message request, err=%s", err))
+		}
+		if !validateCreateWidgetMessageRequest {
+			return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to validate create widget message request, err=%s", err))
+		}
+		createMessageRequestContext.CreateWidget = true
+	}
 
 	memberState, err := GetMemberStateInCommunity(chatroom.CommunityID, userinfo.UserID)
 	if err != nil {
@@ -95,29 +116,24 @@ func GetMessageByID(messageID float64) (*models.Message, error) {
 }
 
 func validateCreatePollMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, communityID int64) error {
-	communityConfigurationChatPollDefault := &constant.CommunityConfiguration{}
-	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationChatPoll)
+	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationChatPollEnum)
 	if err != nil && err.Error() != "record not found" {
-		log.Printf("failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPoll, err)
+		log.Printf("failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPollEnum, err)
 	}
 	if err != nil && err.Error() == "record not found" {
-		log.Printf("using default, failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPoll, err)
-		communityConfigurationChatPollDefault = constant.CommunityConfigurationChatPollDefault
-	}
-
-	if communityConfigurationChatPollDefault.Type == constant.CommunityConfigurationChatPoll {
+		log.Printf("using default, failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPollEnum, err)
 		err := validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest)
 		if err != nil {
 			return fmt.Errorf("failed to validate create poll message against default community configuration")
 		}
 	} else {
 		communityConfigurationChatPollValue := configuration.Value
-		var communityConfigurationValueStruct constant.CommunityConfigurationValue
-		err := json.Unmarshal([]byte(communityConfigurationChatPollValue), &communityConfigurationValueStruct)
+		var communityConfigurationChatPollValueStruct constant.CommunityConfigurationChatPollValue
+		err := json.Unmarshal([]byte(communityConfigurationChatPollValue), &communityConfigurationChatPollValueStruct)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal community configuration chat poll")
 		}
-		err = validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest, &communityConfigurationValueStruct)
+		err = validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest, &communityConfigurationChatPollValueStruct)
 		if err != nil {
 			return fmt.Errorf("failed to validate create poll message against community configuration")
 		}
@@ -156,20 +172,20 @@ func validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest
 	return nil
 }
 
-func validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest *requestresponse.CreateMessageRequest, communityConfigurationValueStruct *constant.CommunityConfigurationValue) error {
-	if communityConfigurationValueStruct.AllowOveride {
+func validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest *requestresponse.CreateMessageRequest, communityConfigurationChatPollValueStruct *constant.CommunityConfigurationChatPollValue) error {
+	if communityConfigurationChatPollValueStruct.AllowOveride {
 		return nil
 	}
 
-	if communityConfigurationValueStruct.PollType != "" {
-		pollTypeInt := constant.GetMessagePollTypeFromEnum(communityConfigurationValueStruct.PollType)
+	if communityConfigurationChatPollValueStruct.PollType != "" {
+		pollTypeInt := constant.GetMessagePollTypeFromEnum(communityConfigurationChatPollValueStruct.PollType)
 		var pollTypeInt32 = new(int32)
 		*pollTypeInt32 = int32(pollTypeInt)
 		createMessageRequest.PollType = pollTypeInt32
 	}
 
-	if communityConfigurationValueStruct.MultipleSelectState != "" {
-		multiSelectStateInt := constant.GetMessagePollMultiSelectStateFromEnum(communityConfigurationValueStruct.MultipleSelectState)
+	if communityConfigurationChatPollValueStruct.MultipleSelectState != "" {
+		multiSelectStateInt := constant.GetMessagePollMultiSelectStateFromEnum(communityConfigurationChatPollValueStruct.MultipleSelectState)
 		var multiSelectStateInt64 = new(int64)
 		*multiSelectStateInt64 = int64(multiSelectStateInt)
 		createMessageRequest.MultilpleSelectState = multiSelectStateInt64
@@ -178,16 +194,16 @@ func validateCreatePollMessageCustomerCommunityConfiguration(createMessageReques
 
 	var multilpleSelectNoDefault = new(int64)
 	*multilpleSelectNoDefault = int64(1)
-	if createMessageRequest.MultilpleSelectNo = multilpleSelectNoDefault; communityConfigurationValueStruct.MultipleSelectNo != 0 {
+	if createMessageRequest.MultilpleSelectNo = multilpleSelectNoDefault; communityConfigurationChatPollValueStruct.MultipleSelectNo != 0 {
 		var multilpleSelectNo = new(int64)
-		*multilpleSelectNo = int64(communityConfigurationValueStruct.MultipleSelectNo)
+		*multilpleSelectNo = int64(communityConfigurationChatPollValueStruct.MultipleSelectNo)
 		createMessageRequest.MultilpleSelectNo = multilpleSelectNo
 	}
 
-	createMessageRequest.IsAnonymous = communityConfigurationValueStruct.IsAnonymous
-	createMessageRequest.AllowAddOption = communityConfigurationValueStruct.AllowAddOption
-	createMessageRequest.NoPollExpiry = communityConfigurationValueStruct.NoPollExpiry
-	createMessageRequest.AllowVoteChange = communityConfigurationValueStruct.AllowVoteChange
+	createMessageRequest.IsAnonymous = communityConfigurationChatPollValueStruct.IsAnonymous
+	createMessageRequest.AllowAddOption = communityConfigurationChatPollValueStruct.AllowAddOption
+	createMessageRequest.NoPollExpiry = communityConfigurationChatPollValueStruct.NoPollExpiry
+	createMessageRequest.AllowVoteChange = communityConfigurationChatPollValueStruct.AllowVoteChange
 
 	if createMessageRequest.NoPollExpiry {
 		createMessageRequest.ExpiryTime = nil
@@ -198,6 +214,26 @@ func validateCreatePollMessageCustomerCommunityConfiguration(createMessageReques
 	}
 
 	return nil
+}
+
+func validateCreateWidgetMessageRequest(communityID int) (bool, error) {
+	configuration, err := GetCommunityConfiguration(int(communityID), constant.CommunityConfigurationWidgetMetadataEnum)
+	if err != nil && err.Error() != "record not found" {
+		log.Printf("failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationFeedMetaDataEnum, err)
+	}
+	if err != nil && err.Error() == "record not found" {
+		log.Printf("using default, failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationFeedMetaDataEnum, err)
+		return constant.CommunityConfigurationWidgetMetadataDefault.Value.(constant.CommunityConfigurationWidgetMetadataValue).Message, nil
+	} else {
+		communityConfigurationWidgetMetadataValue := configuration.Value
+		var communityConfigurationWidgetMetadataValueStruct constant.CommunityConfigurationWidgetMetadataValue
+		err := json.Unmarshal([]byte(communityConfigurationWidgetMetadataValue), &communityConfigurationWidgetMetadataValueStruct)
+		if err != nil {
+			return false, fmt.Errorf("failed to unmarshal community configuration widget metadata, err=%s", err)
+		}
+
+		return communityConfigurationWidgetMetadataValueStruct.Message, nil
+	}
 }
 
 func ValidateCreateMessagePermission(createMessageRequest *requestresponse.CreateMessageRequest, chatroom *models.Chatroom, userIDInt int, memberState int) *constant.APIError {
@@ -422,12 +458,40 @@ func FillCreateMessagePollModelInstances(createMessagePollsModelInstances *[]mod
 	return nil
 }
 
+func GetSwarmCreateWidgetRequest(
+	UUID string,
+	apiKey string,
+	communityID int,
+	messageWidgetTypeMessageEnum string,
+	widgetData interface{},
+) (*requestresponse.SwarmCreateWidgetRequest, *constant.APIError) {
+
+	swarmRequestHeaders := &requestresponse.SwarmRequestHeaders{
+		MemberID:     UUID,
+		APIKey:       apiKey,
+		PlatformType: constant.PlatformTypePandemoniumService,
+	}
+
+	swarmCreateWidgetRequestBody := &requestresponse.SwarmCreateWidgetRequestBody{
+		ParentEntityType: constant.MessageWidgetTypeMessageEnum,
+		Metadata:         widgetData,
+	}
+
+	swarmCreateWidgetRequest := &requestresponse.SwarmCreateWidgetRequest{
+		Headers:     *swarmRequestHeaders,
+		RequestBody: *swarmCreateWidgetRequestBody,
+	}
+
+	return swarmCreateWidgetRequest, nil
+}
+
 func CreateMessageInDB(
 	createMessageModelInstance *models.Message,
 	createMessageAttachmentModelInstances []models.MessageAttachment,
 	createMessagePollModelInstances []models.MessagePoll,
+	swarmCreateWidgetRequest *requestresponse.SwarmCreateWidgetRequest,
 ) (int64, *constant.APIError) {
-	messageID, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances, createMessagePollModelInstances)
+	messageID, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances, createMessagePollModelInstances, swarmCreateWidgetRequest)
 	if err != nil {
 		return 0, constant.APIErrorInternalServerError(fmt.Errorf("failed to create message in database, err=%s", err))
 	}
@@ -475,7 +539,7 @@ func CreateMessageCaravanTasks(
 	memberState int,
 	createMessageRequest *requestresponse.CreateMessageRequest,
 ) {
-	requestPostBody := &requestresponse.CreateMessageCaravanTask{
+	requestPostBody := &requestresponse.CaravanCreateMessageTaskRequest{
 		ApiVersion:      apiVersion,
 		ChatroomID:      chatroomId,
 		ChatroomStateID: chatroomStateID,
@@ -484,7 +548,7 @@ func CreateMessageCaravanTasks(
 		RequestBody:     createMessageRequest,
 		UserID:          userID,
 	}
-	enpoint := external.EnpointCreateMessageCaravanTasks
+	enpoint := external.EnpointCaravanCreateMessageTask
 
 	external.NewAPIClientCaravan().Post(enpoint, requestPostBody)
 }

@@ -18,16 +18,16 @@ func NewUserInfoRepository() *UserInfoRepository {
 	}
 }
 
-func GetUserInfoByUUID(uuid string) (*models.UserInfo, error) {
+func GetUserInfoByUUID(UUID string) (*models.UserInfo, error) {
 	userInfo := &models.UserInfo{}
 
 	filter := map[string]interface{}{
-		"user_unique_id": uuid,
+		"user_unique_id": UUID,
 	}
 
 	err := NewUserInfoRepository().userInfoDatabase.Where(filter).First(&userInfo).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user info, user id=%s, err=%s", uuid, err)
+		return nil, fmt.Errorf("failed to get user info, user id=%s, err=%s", UUID, err)
 	}
 
 	return userInfo, nil

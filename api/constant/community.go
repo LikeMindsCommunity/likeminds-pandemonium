@@ -1,25 +1,25 @@
 package constant
 
 const (
-	CommunityConfigurationMediaLimitsEnum         = "media_limits"
-	CommunityConfigurationFeedMetaData            = "feed_metadata"
-	CommunityConfigurationProfileMetaData         = "profile_metadata"
-	CommunityConfigurationNSFWFiltering           = "nsfw_filtering"
-	CommunityConfigurationWidgetMetadata          = "widgets_metadata"
-	CommunityConfigurationGuestFlowMetaData       = "guest_flow_metadata"
-	CommunityConfigurationFeedSettings            = "feed_settings"
-	CommunityConfigurationPersonalisedFeedWeights = "personalised_feed_weights"
-	CommunityConfigurationChatbot                 = "chatbot"
-	CommunityConfigurationChatPoll                = "chat_poll"
+	CommunityConfigurationMediaLimitsEnum             = "media_limits"
+	CommunityConfigurationFeedMetaDataEnum            = "feed_metadata"
+	CommunityConfigurationProfileMetaDataEnum         = "profile_metadata"
+	CommunityConfigurationNSFWFilteringEnum           = "nsfw_filtering"
+	CommunityConfigurationWidgetMetadataEnum          = "widgets_metadata"
+	CommunityConfigurationGuestFlowMetaDataEnum       = "guest_flow_metadata"
+	CommunityConfigurationFeedSettingsEnum            = "feed_settings"
+	CommunityConfigurationPersonalisedFeedWeightsEnum = "personalised_feed_weights"
+	CommunityConfigurationChatbotEnum                 = "chatbot"
+	CommunityConfigurationChatPollEnum                = "chat_poll"
 )
 
 type CommunityConfiguration struct {
 	Type        string
 	Description string
-	Value       CommunityConfigurationValue
+	Value       interface{}
 }
 
-type CommunityConfigurationValue struct {
+type CommunityConfigurationChatPollValue struct {
 	AllowOveride        bool
 	PollType            string
 	NoPollExpiry        bool
@@ -30,17 +30,14 @@ type CommunityConfigurationValue struct {
 	AllowAddOption      bool
 }
 
-var CommunityConfigurationChatPollDefault = &CommunityConfiguration{
-	Type:        CommunityConfigurationChatPoll,
-	Description: "Chat poll configurations for the community.",
-	Value: CommunityConfigurationValue{
-		AllowOveride:        true,
-		PollType:            "instant", // values - "instant" | "deferred" | "open"
-		NoPollExpiry:        false,
-		AllowVoteChange:     false,
-		MultipleSelectState: "exactly", // values - "exactly" | "at_max" | "at_most" | "at_least"
-		MultipleSelectNo:    1,
-		IsAnonymous:         false,
-		AllowAddOption:      false,
+type CommunityConfigurationWidgetMetadataValue struct {
+	Message bool
+}
+
+var CommunityConfigurationWidgetMetadataDefault = &CommunityConfiguration{
+	Type:        CommunityConfigurationWidgetMetadataEnum,
+	Description: "Widget metadata configurations for the community",
+	Value: CommunityConfigurationWidgetMetadataValue{
+		Message: false,
 	},
 }

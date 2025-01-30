@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"likeminds-pandemonium/api/models"
+	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/database"
 	"time"
 
@@ -39,6 +40,7 @@ func CreateMessage(
 	createMessageModelInstance *models.Message,
 	createMessageAttachmentModelInstances []models.MessageAttachment,
 	createMessagePollModelInstances []models.MessagePoll,
+	swarmCreateWidgetRequest *requestresponse.SwarmCreateWidgetRequest,
 ) (int64, error) {
 
 	tx := NewMessageRepository().messageDatabase.Begin()
@@ -49,6 +51,16 @@ func CreateMessage(
 		return 0, fmt.Errorf("failed to create message in database, rollingback, err=%s", message.Error)
 	}
 	messageID := createMessageModelInstance.ID
+
+	if swarmCreateWidgetRequest != nil {
+		// TODO:
+		// 1. update swarm widget request with above message id
+		// 2. send request to swarm
+		// 3. err -> rollback transaction
+		// 4. success -> retrieve widget id and update message with widget id
+	}
+
+	tx.Rollback()
 
 	if len(createMessageAttachmentModelInstances) > 0 {
 		createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))

@@ -6,10 +6,10 @@ import (
 	"likeminds-pandemonium/api/repository"
 )
 
-func GetUserInfoByUUID(userID string) (*models.UserInfo, error) {
-	userinfo, err := repository.GetUserInfoByUUID(userID)
+func GetUserInfoByUUID(UUID string) (*models.UserInfo, error) {
+	userinfo, err := repository.GetUserInfoByUUID(UUID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user info, user id=%s, err=%s", userID, err)
+		return nil, fmt.Errorf("failed to get user info, user id=%s, err=%s", UUID, err)
 	}
 
 	return userinfo, nil

@@ -1,6 +1,6 @@
 package requestresponse
 
-type CreateMessageCaravanTask struct {
+type CaravanCreateMessageTaskRequest struct {
 	ApiVersion      int                   `json:"api_version,omitempty"`
 	ChatroomID      int                   `json:"chatroom_id,omitempty"`
 	ChatroomStateID int                   `json:"chatroom_state_id,omitempty"`

@@ -12,6 +12,7 @@ const (
 
 const (
 	HeadersMemberID     = "x-member-id"
+	HeadersApiKey       = "x-api-key"
 	HeadersDeviceID     = "x-device-id"
 	HeadersPlatformCode = "x-platform-code"
 	HeadersVersionCode  = "x-version-code"
@@ -25,4 +26,8 @@ const (
 	HTTPResponseCodeUnauthorised        = 401
 	HTTPResponseCodeForbidden           = 403
 	HTTPResponseCodeInternalServerError = 500
+)
+
+const (
+	PlatformTypePandemoniumService = "pandemonium-service"
 )
