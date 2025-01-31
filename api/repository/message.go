@@ -107,7 +107,7 @@ func CreateMessage(
 		}
 	}
 
-	chatroom := tx.Model(&models.Chatroom{}).Where("id = ?", createMessageModelInstance.CardID).Update("updated_at", time.Now().Unix())
+	chatroom := tx.Model(&models.Chatroom{}).Where("id = ?", createMessageModelInstance.CardID).Update("updated_at", time.Now().UnixMilli())
 	if chatroom.Error != nil {
 		tx.Rollback()
 		return 0, fmt.Errorf("failed to update chatroom in database, rollingback, err=%s", chatroom.Error)

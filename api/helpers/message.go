@@ -295,7 +295,7 @@ func FillCreateMessageModelInstance(
 
 	createMessageModelInstance.CardID = int(requestContext.Chatroom.ID)
 	createMessageModelInstance.CommunityID = int(requestContext.Community.ID)
-	createMessageModelInstance.CreatedAt = time.Now().Unix()
+	createMessageModelInstance.CreatedAt = time.Now().UnixMilli()
 	createMessageModelInstance.DeviceID = &deviceID
 	createMessageModelInstance.IsGuest = isGuest
 	createMessageModelInstance.TemporaryID = &createMessageRequest.TemporaryID
@@ -418,7 +418,7 @@ func FillCreateMessageAttachmentsModelInstances(createMessageAttachmentModelInst
 		createMessageAttachmentModelInstance.Width = &createMessageRequestAttachments[i].Width
 		createMessageAttachmentModelInstance.Height = &createMessageRequestAttachments[i].Height
 		createMessageAttachmentModelInstance.ThumbnailURL = &createMessageRequestAttachments[i].ThumbnailURL
-		createMessageAttachmentModelInstance.CreatedAt = time.Now().Unix()
+		createMessageAttachmentModelInstance.CreatedAt = time.Now().UnixMilli()
 
 		attachmentMetaMap := createMessageRequestAttachments[i].Meta.(map[string]interface{})
 		attachmentMetaByte, err := json.Marshal(attachmentMetaMap)
@@ -443,8 +443,8 @@ func FillCreateMessagePollModelInstances(createMessagePollsModelInstances *[]mod
 		createMessagePollsModelInstance.ConversationID = createMessageRequestPolls[i].ConversationID
 		createMessagePollsModelInstance.UserID = userID
 		createMessagePollsModelInstance.Text = createMessageRequestPolls[i].Text
-		createMessagePollsModelInstance.CreatedAt = time.Now().Unix()
-		createMessagePollsModelInstance.UpdatedAt = time.Now().Unix()
+		createMessagePollsModelInstance.CreatedAt = time.Now().UnixMilli()
+		createMessagePollsModelInstance.UpdatedAt = time.Now().UnixMilli()
 
 		*createMessagePollsModelInstances = append(*createMessagePollsModelInstances, *createMessagePollsModelInstance)
 	}
