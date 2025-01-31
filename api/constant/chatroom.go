@@ -31,3 +31,9 @@ const (
 const (
 	UserChannelSettingChatroomMemberCanMessage = "member_can_message"
 )
+
+const (
+	DMChatRequestStatesInitiated int = iota
+	DMChatRequestStatesAccepted
+	DMChatRequestStatesRejected
+)

@@ -419,17 +419,17 @@ func FillCreateMessageAttachmentsModelInstances(createMessageAttachmentModelInst
 		createMessageAttachmentModelInstance.Height = &createMessageRequestAttachments[i].Height
 		createMessageAttachmentModelInstance.ThumbnailURL = &createMessageRequestAttachments[i].ThumbnailURL
 		createMessageAttachmentModelInstance.CreatedAt = time.Now().UnixMilli()
-
-		attachmentMetaMap := createMessageRequestAttachments[i].Meta.(map[string]interface{})
-		attachmentMetaByte, err := json.Marshal(attachmentMetaMap)
-		if err != nil {
-			return constant.APIErrorBadRequest(fmt.Errorf("failed to marshal attachment meta, err=%s", err))
-		}
-		attachmentMetaString := string(attachmentMetaByte)
-
-		createMessageAttachmentModelInstance.Meta = &attachmentMetaString
-
 		createMessageAttachmentModelInstance.Name = &createMessageRequestAttachments[i].Name
+
+		if createMessageRequestAttachments[i].Meta != nil {
+			attachmentMetaMap := createMessageRequestAttachments[i].Meta.(map[string]interface{})
+			attachmentMetaByte, err := json.Marshal(attachmentMetaMap)
+			if err != nil {
+				return constant.APIErrorBadRequest(fmt.Errorf("failed to marshal attachment meta, err=%s", err))
+			}
+			attachmentMetaString := string(attachmentMetaByte)
+			createMessageAttachmentModelInstance.Meta = &attachmentMetaString
+		}
 
 		*createMessageAttachmentModelInstances = append(*createMessageAttachmentModelInstances, *createMessageAttachmentModelInstance)
 	}

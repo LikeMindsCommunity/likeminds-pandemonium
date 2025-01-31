@@ -23,12 +23,14 @@ type Client struct {
 	ApiKey string
 	// Topic on which client is connected
 	Topic string
+	// SDK source of the user
+	SDKSource string
 	// Platform Code of user
 	PlatformCode string
 	// Version Code of user
-	VersionCode string
+	VersionCode int
 	// Api Version
-	ApiVersion string
+	ApiVersion int
 }
 
 // WsServer represents web socket server
@@ -43,7 +45,7 @@ type WsServerParent struct {
 }
 
 // NewClient creates new client which will be added to WsServer
-func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, apiKey string, deviceID string, topic string, platformCode string, versionCode string, apiVersion string) *Client {
+func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) *Client {
 	return &Client{
 		Conn:         conn,
 		WsServer:     wsServer,
@@ -51,6 +53,7 @@ func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, apiKey str
 		ApiKey:       apiKey,
 		DeviceID:     deviceID,
 		Topic:        topic,
+		SDKSource:    sdkSource,
 		PlatformCode: platformCode,
 		VersionCode:  versionCode,
 		ApiVersion:   apiVersion,

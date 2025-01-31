@@ -10,10 +10,9 @@ import (
 	"likeminds-pandemonium/api/utilities"
 	"likeminds-pandemonium/common"
 	"log"
-	"strconv"
 )
 
-func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, platformCode string, versionCode string, apiVersion string) requestresponse.PSResponse {
+func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) requestresponse.PSResponse {
 
 	psResponse := &requestresponse.PSResponse{
 		DeviceID:         deviceID,
@@ -22,16 +21,17 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 	}
 
 	createMessageResponse := &requestresponse.CreateMessageResponse{}
+	apiError := &constant.APIError{}
 
 	CreateMessageData, err := json.Marshal(messageData["data"])
 	if err != nil {
-		var apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to marshal create message json data, err=%s", err))
+		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to marshal create message json data, err=%s", err))
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
 	var createMessageRequest requestresponse.CreateMessageRequest
 	if err := json.Unmarshal(CreateMessageData, &createMessageRequest); err != nil {
-		var apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to unmarshal create message request, err=%s", err))
+		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to unmarshal create message request, err=%s", err))
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
@@ -50,8 +50,15 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		log.Printf("failed to get collabcard state, chatroom=%d, user=%d", requestContext.Chatroom.ID, requestContext.UserInfo.UserID)
 	}
 
-	if collabcardState.ID != 0 {
-		// TODO: add m2cm v2 check
+	if collabcardState != nil {
+		if constant.VersionCheck(sdkSource, platformCode, versionCode, apiVersion, constant.FeatureM2CMEnum) &&
+			requestContext.Chatroom.IsPrivate &&
+			requestContext.Chatroom.IsPrivateMember &&
+			requestContext.Chatroom.Type == constant.ChatroomTypeDirectMessage &&
+			*collabcardState.ChatRequestState == constant.DMChatRequestStatesRejected {
+			apiError = constant.APIErrorForbidden(fmt.Errorf("failed to create message, user is blocked"))
+			return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		}
 	}
 
 	isMemberVerifiedInCommunity, err := helpers.IsMemberVerifiedInCommunity(int(requestContext.Community.ID), int(requestContext.UserInfo.UserID))
@@ -98,16 +105,11 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 	}
 	log.Printf("created message, id=%d", messageID)
 
-	apiVersionInt, err := strconv.Atoi(apiVersion)
-	if err != nil {
-		log.Printf("failed to convert api_version to integer, err=%s", err)
-	}
-
 	utilities.SafeGo(func() {
 		helpers.CreateMessageCaravanTasks(
 			int(requestContext.Chatroom.ID),
 			int(messageID),
-			apiVersionInt,
+			apiVersion,
 			collabcardState.ID,
 			requestContext.UserInfo.UserID,
 			requestContext.MemberState,
