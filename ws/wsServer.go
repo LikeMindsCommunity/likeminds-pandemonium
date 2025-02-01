@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"likeminds-pandemonium/common"
+	"log"
+	"time"
 )
 
 // Client represents the websocket client connected with the server
@@ -46,6 +48,7 @@ func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID s
 
 // SendPayloadToClientConnection sends the payload to the client's WebSocket connection
 func (client *Client) SendPayloadToClientConnection(payload interface{}) error {
+	updateWriteDeadline(client.Conn)
 	// Marshal the payload into JSON bytes
 	messagePayloadByte, err := json.Marshal(payload)
 	if err != nil {
@@ -153,4 +156,13 @@ func (parent *WsServerParent) GetConnectionFromWsServer(topic string, senderUUID
 		}
 	}
 	return nil
+}
+
+func updateWriteDeadline(conn *websocket.Conn) {
+	// SetWriteDeadline to time.Now() + WriteWait
+	err := conn.SetWriteDeadline(time.Now().Add(common.WriteWait))
+	if err != nil {
+		log.Println(common.ErrorWriteDeadlineWs, err)
+		return
+	}
 }

@@ -148,7 +148,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		senderUUID, _ := conversationMap["sender_uuid"].(string)
 
 		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
 			log.Println(err)
 		}
 	}
