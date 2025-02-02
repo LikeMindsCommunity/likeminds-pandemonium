@@ -23,7 +23,7 @@ func NewMessageRepository() *MessageRepository {
 	}
 }
 
-func GetMessageByID(ID string) (*models.Message, error) {
+func GetMessageByID(ID int) (*models.Message, error) {
 	message := &models.Message{}
 
 	filter := map[string]interface{}{
@@ -32,7 +32,7 @@ func GetMessageByID(ID string) (*models.Message, error) {
 
 	err := NewMessageRepository().messageDatabase.Where(filter).First(&message).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message, message id=%s, err=%s", ID, err)
+		return nil, fmt.Errorf("failed to get message, message id=%d, err=%s", ID, err)
 	}
 
 	return message, nil

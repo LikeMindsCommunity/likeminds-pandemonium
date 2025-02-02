@@ -89,9 +89,9 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 	createMessageRequestContext.MemberState = *memberState
 
 	if createMessageRequest.RepliedConversationId != nil {
-		originalMessage, err := GetMessageByID(createMessageRequest.RepliedConversationId.(float64))
+		originalMessage, err := GetMessageByID(int(createMessageRequest.RepliedConversationId.(float64)))
 		if err != nil {
-			return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get replied message, message id=%f, err=%s", createMessageRequest.RepliedConversationId.(float64), err))
+			return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get replied message, message id=%d, err=%s", int(createMessageRequest.RepliedConversationId.(float64)), err))
 		}
 		createMessageRequestContext.OriginalMessage = *originalMessage
 	}
@@ -106,11 +106,10 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 	return createMessageRequestContext, nil
 }
 
-func GetMessageByID(messageID float64) (*models.Message, error) {
-	messageIDStr := fmt.Sprintf("%g", messageID)
-	message, err := repository.GetMessageByID(messageIDStr)
+func GetMessageByID(messageID int) (*models.Message, error) {
+	message, err := repository.GetMessageByID(messageID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message, message id=%f, err=%s", messageID, err)
+		return nil, fmt.Errorf("failed to get message, message id=%d, err=%s", messageID, err)
 	}
 	return message, nil
 }
