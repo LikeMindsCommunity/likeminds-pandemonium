@@ -17,12 +17,12 @@ import (
 )
 
 type CreateMessageRequestContext struct {
-	UserInfo        models.UserInfo  `json:"userinfo"`
-	Chatroom        models.Chatroom  `json:"chatroom"`
-	Community       models.Community `json:"community"`
-	MemberState     int              `json:"member_state"`
-	OriginalMessage models.Message   `json:"original_message"`
-	CreateWidget    bool             `json:"create_widget"`
+	UserInfo        *models.UserInfo  `json:"userinfo"`
+	Chatroom        *models.Chatroom  `json:"chatroom"`
+	Community       *models.Community `json:"community"`
+	MemberState     int               `json:"member_state"`
+	OriginalMessage *models.Message   `json:"original_message"`
+	CreateWidget    bool              `json:"create_widget"`
 }
 
 func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMessageRequest, UUID string, apiKey string, deviceID string, topic string) (*CreateMessageRequestContext, *constant.APIError) {
@@ -38,13 +38,13 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 	if err != nil {
 		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get user, user id=%s, err=%s", UUID, err))
 	}
-	createMessageRequestContext.UserInfo = *userinfo
+	createMessageRequestContext.UserInfo = userinfo
 
 	chatroom, err := GetChatroomByID(int64(createMessageRequest.ChatroomID))
 	if err != nil {
 		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get chatroom, chatroom id=%d, err=%s", createMessageRequest.ChatroomID, err))
 	}
-	createMessageRequestContext.Chatroom = *chatroom
+	createMessageRequestContext.Chatroom = chatroom
 
 	sdkCommunity, err := GetSDKClientByApiKey(apiKey)
 	if err != nil {
@@ -69,7 +69,7 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 	if err != nil {
 		return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get community, community id=%d, err=%s", chatroom.CommunityID, err))
 	}
-	createMessageRequestContext.Community = *community
+	createMessageRequestContext.Community = community
 
 	if createMessageRequest.Metadata != nil {
 		validateCreateWidgetMessageRequest, err := validateCreateWidgetMessageRequest(int(community.ID))
@@ -93,7 +93,9 @@ func ValidateCreateMessageRequest(createMessageRequest *requestresponse.CreateMe
 		if err != nil {
 			return nil, constant.APIErrorBadRequest(fmt.Errorf("failed to get replied message, message id=%d, err=%s", int(createMessageRequest.RepliedConversationId.(float64)), err))
 		}
-		createMessageRequestContext.OriginalMessage = *originalMessage
+		createMessageRequestContext.OriginalMessage = originalMessage
+	} else {
+		createMessageRequestContext.OriginalMessage = nil
 	}
 
 	if createMessageRequest.State == int32(constant.MessageStateMessagePoll) {
@@ -120,18 +122,18 @@ func validateCreatePollMessageRequest(createMessageRequest *requestresponse.Crea
 		log.Printf("using default, failed to get community configuration, community=%d, configuration=%s, err=%s", communityID, constant.CommunityConfigurationChatPollEnum, err)
 		err := validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest)
 		if err != nil {
-			return fmt.Errorf("failed to validate create poll message against default community configuration")
+			return fmt.Errorf("failed to validate create poll message against default community configuration, err=%s", err)
 		}
 	} else {
 		communityConfigurationChatPollValue := configuration.Value
 		var communityConfigurationChatPollValueStruct constant.CommunityConfigurationChatPollValue
 		err := json.Unmarshal([]byte(communityConfigurationChatPollValue), &communityConfigurationChatPollValueStruct)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal community configuration chat poll")
+			return fmt.Errorf("failed to unmarshal community configuration chat poll, err=%s", err)
 		}
 		err = validateCreatePollMessageCustomerCommunityConfiguration(createMessageRequest, &communityConfigurationChatPollValueStruct)
 		if err != nil {
-			return fmt.Errorf("failed to validate create poll message against community configuration")
+			return fmt.Errorf("failed to validate create poll message against community configuration, err=%s", err)
 		}
 	}
 
@@ -140,17 +142,17 @@ func validateCreatePollMessageRequest(createMessageRequest *requestresponse.Crea
 
 func validateCreatePollMessageDefaultCommunityConfiguration(createMessageRequest *requestresponse.CreateMessageRequest) error {
 	if createMessageRequest.PollType == nil {
-		return fmt.Errorf("poll_type is missing, required")
+		return fmt.Errorf("poll_type missing, required")
 	}
 
 	if createMessageRequest.ExpiryTime == nil && !createMessageRequest.NoPollExpiry {
-		return fmt.Errorf("expiry_time is missing, required")
+		return fmt.Errorf("poll expiry is reset, expiry_time missing, required")
 	}
 
 	var pollType = new(int)
 	*pollType = int(*createMessageRequest.PollType)
-	if *pollType == constant.MessagePollTypeDeferred && !createMessageRequest.NoPollExpiry {
-		return fmt.Errorf("expiry_time is missing, required")
+	if *pollType == constant.MessagePollTypeDeferred && createMessageRequest.NoPollExpiry {
+		return fmt.Errorf("invalid no poll expiry value, poll type=%s, no_poll_expiry=%t", constant.MessagePollTypeDeferredEnum, createMessageRequest.NoPollExpiry)
 	}
 
 	if createMessageRequest.NoPollExpiry {
@@ -300,7 +302,10 @@ func FillCreateMessageModelInstance(
 	createMessageModelInstance.TemporaryID = &createMessageRequest.TemporaryID
 	createMessageModelInstance.UserID = int(requestContext.UserInfo.UserID)
 	createMessageModelInstance.Platform = &platformCode
-	createMessageRequest.RepliedConversationId = requestContext.OriginalMessage.ID
+
+	if requestContext.OriginalMessage != nil {
+		createMessageRequest.RepliedConversationId = requestContext.OriginalMessage.ID
+	}
 
 	if createMessageRequest.OGTags != nil {
 		ogTagsMap := createMessageRequest.OGTags.(map[string]interface{})
@@ -362,13 +367,7 @@ func FillCreatePollMessageModelInstance(createMessageModelInstance *models.Messa
 
 	createMessageModelInstance.IsAnonymous = createMessageRequest.IsAnonymous
 	createMessageModelInstance.AllowAddOption = createMessageRequest.AllowAddOption
-
-	if createMessageModelInstance.ExpiryTime = nil; createMessageRequest.ExpiryTime != nil {
-		var expiryTime = new(int)
-		*expiryTime = int(*createMessageRequest.ExpiryTime)
-		createMessageModelInstance.PollType = expiryTime
-	}
-
+	createMessageModelInstance.ExpiryTime = createMessageRequest.ExpiryTime
 	createMessageModelInstance.NoPollExpiry = createMessageRequest.NoPollExpiry
 	createMessageModelInstance.AllowVoteChange = createMessageRequest.AllowVoteChange
 	createMessageModelInstance.PollAnswerText = constant.MessagePollAnswerText
@@ -483,13 +482,13 @@ func CreateMessageInDB(
 	createMessageAttachmentModelInstances []models.MessageAttachment,
 	createMessagePollModelInstances []models.MessagePoll,
 	swarmCreateWidgetRequest *requestresponse.SwarmCreateWidgetRequest,
-) (int64, *constant.APIError) {
-	messageID, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances, createMessagePollModelInstances, swarmCreateWidgetRequest)
+) (*requestresponse.MessageResponse, *constant.APIError) {
+	messageResponse, err := repository.CreateMessage(createMessageModelInstance, createMessageAttachmentModelInstances, createMessagePollModelInstances, swarmCreateWidgetRequest)
 	if err != nil {
-		return 0, constant.APIErrorInternalServerError(fmt.Errorf("failed to create message in database, err=%s", err))
+		return messageResponse, constant.APIErrorInternalServerError(fmt.Errorf("failed to create message in database, err=%s", err))
 	}
 
-	return messageID, nil
+	return messageResponse, nil
 }
 
 func CreateMessageErrorResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) requestresponse.PSResponse {
@@ -507,12 +506,12 @@ func CreateMessageErrorResponse(psResponse *requestresponse.PSResponse, createMe
 func fillCreateMessageErrorResponse(createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) {
 	createMessageResponse.HTTPStatusCode = apiError.HTTPStatusCode
 	createMessageResponse.Success = false
-	createMessageResponse.Message = nil
+	createMessageResponse.Data = &requestresponse.MessageResponse{}
 	createMessageResponse.Error = apiError.Error()
 }
 
-func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, createMessageModelInstance *models.Message) requestresponse.PSResponse {
-	fillCreateMessageSuccessResponse(createMessageResponse, createMessageModelInstance)
+func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) requestresponse.PSResponse {
+	fillCreateMessageSuccessResponse(createMessageResponse, messageResponse)
 
 	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
 	if err != nil {
@@ -546,10 +545,10 @@ func CreateMessageCaravanTasks(
 	external.NewAPIClientCaravan().Post(enpoint, requestPostBody)
 }
 
-func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, createMessageModelInstance *models.Message) {
+func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) {
 	createMessageResponse.HTTPStatusCode = constant.HTTPResponseCodeOK
 	createMessageResponse.Success = true
-	createMessageResponse.Message = createMessageModelInstance
+	createMessageResponse.Data = messageResponse
 	createMessageResponse.Error = ""
 }
 

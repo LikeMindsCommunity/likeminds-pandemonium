@@ -75,15 +75,7 @@ const (
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
-	ErrorConversationIDsInvalid  = "invalid conversation IDs in request"
-	ErrorChatroomIdMismatch      = "chatroom ID mismatch in request on subscribed topic"
-)
-
-const (
-	ErrorUserNotFound           = "user not found"
-	ErrorChatroomNotFound       = "chatroom not found"
-	ErrorCommunityNotFound      = "community not found"
-	ErrorRepliedMessageNotFound = "replied conversation not found"
+	ErrorConversationIDMissing   = "conversation ID is missing in request"
 )
 
 const (

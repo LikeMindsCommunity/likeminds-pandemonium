@@ -40,7 +40,7 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
 
-	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, &requestContext.Chatroom, requestContext.UserInfo.UserID, requestContext.MemberState)
+	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, requestContext.Chatroom, requestContext.UserInfo.UserID, requestContext.MemberState)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
@@ -99,16 +99,18 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		}
 	}
 
-	messageID, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances, *createMessagePollModelInstances, swarmCreateWidgetRequest)
+	messageResponse, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances, *createMessagePollModelInstances, swarmCreateWidgetRequest)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
 	}
-	log.Printf("created message, id=%d", messageID)
+	messageResponse.User = requestContext.UserInfo
+	messageResponse.RepliedMessage = requestContext.OriginalMessage
+	log.Printf("created message, id=%d", messageResponse.Message.ID)
 
 	utilities.SafeGo(func() {
 		helpers.CreateMessageCaravanTasks(
 			int(requestContext.Chatroom.ID),
-			int(messageID),
+			int(messageResponse.Message.ID),
 			apiVersion,
 			collabcardState.ID,
 			requestContext.UserInfo.UserID,
@@ -117,5 +119,5 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		)
 	})
 
-	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, createMessageModelInstance)
+	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse)
 }

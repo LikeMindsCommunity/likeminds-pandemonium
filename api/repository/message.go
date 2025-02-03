@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"likeminds-pandemonium/api/models"
@@ -43,14 +44,17 @@ func CreateMessage(
 	createMessageAttachmentModelInstances []models.MessageAttachment,
 	createMessagePollModelInstances []models.MessagePoll,
 	swarmCreateWidgetRequest *requestresponse.SwarmCreateWidgetRequest,
-) (int64, error) {
+) (*requestresponse.MessageResponse, error) {
+
+	messageResponse := &requestresponse.MessageResponse{}
+	var swarmWidgetResponse *requestresponse.SwarmWidgetResponse = nil
 
 	tx := NewMessageRepository().messageDatabase.Begin()
 
 	message := tx.Create(createMessageModelInstance)
 	if message.Error != nil {
 		tx.Rollback()
-		return 0, fmt.Errorf("failed to create message in database, rollingback, err=%s", message.Error)
+		return messageResponse, fmt.Errorf("failed to create message in database, rollingback, err=%s", message.Error)
 	}
 	messageID := createMessageModelInstance.ID
 
@@ -59,17 +63,26 @@ func CreateMessage(
 		swarmResponse, err := external.NewAPIClientSwarm().Post(external.EnpointSwarmCreateWidget, swarmCreateWidgetRequest.Headers, swarmCreateWidgetRequest.RequestBody)
 		if err != nil {
 			tx.Rollback()
-			return 0, fmt.Errorf("failed to create widget in swarm, rollingback, err=%s", err)
+			return messageResponse, fmt.Errorf("failed to create widget in swarm, rollingback, err=%s", err)
 		}
-		widgetID := swarmResponse.Data["widget"].(map[string]interface{})["_id"]
-		message := tx.Model(&models.Message{}).Where("id = ?", messageID).Update("widget_id", widgetID)
+		swarmWidgetResponseData, err := json.Marshal(swarmResponse.Data["widget"].(map[string]interface{}))
+		if err != nil {
+			tx.Rollback()
+			return messageResponse, fmt.Errorf("failed to marshal swarm widget response, rollingback, err=%s", err)
+		}
+		err = json.Unmarshal(swarmWidgetResponseData, &swarmWidgetResponse)
+		if err != nil {
+			tx.Rollback()
+			return messageResponse, fmt.Errorf("failed to unmarshal swarm widget response, rollingback, err=%s", err)
+		}
+		message := tx.Model(&models.Message{}).Where("id = ?", messageID).Update("widget_id", swarmWidgetResponse.ID)
 		if message.Error != nil {
 			tx.Rollback()
-			return 0, fmt.Errorf("failed to update message widget in database, rollingback, err=%s", message.Error)
+			return messageResponse, fmt.Errorf("failed to update message widget in database, rollingback, err=%s", message.Error)
 		}
 		if int(message.RowsAffected) != 1 {
 			tx.Rollback()
-			return 0, errors.New("failed to update message widget in database, rollingback")
+			return messageResponse, errors.New("failed to update message widget in database, rollingback")
 		}
 	}
 
@@ -77,16 +90,16 @@ func CreateMessage(
 		createMessageAttachmentModelInstances, err := updateAttachmentsWithMessageID(createMessageAttachmentModelInstances, int(messageID))
 		if err != nil {
 			tx.Rollback()
-			return 0, fmt.Errorf("failed to attach messageID to attachments, rollingback, err=%s", err)
+			return messageResponse, fmt.Errorf("failed to attach messageID to attachments, rollingback, err=%s", err)
 		}
 		attachments := tx.Create(createMessageAttachmentModelInstances)
 		if attachments.Error != nil {
 			tx.Rollback()
-			return 0, fmt.Errorf("failed to create message attachments in database, rollingback, err=%s", attachments.Error)
+			return messageResponse, fmt.Errorf("failed to create message attachments in database, rollingback, err=%s", attachments.Error)
 		}
 		if int(attachments.RowsAffected) != len(createMessageAttachmentModelInstances) {
 			tx.Rollback()
-			return 0, errors.New("failed to create all message attachments in database, rollingback")
+			return messageResponse, errors.New("failed to create all message attachments in database, rollingback")
 		}
 	}
 
@@ -94,32 +107,37 @@ func CreateMessage(
 		createMessagePollModelInstances, err := updatePollsWithMessageID(createMessagePollModelInstances, int(messageID))
 		if err != nil {
 			tx.Rollback()
-			return 0, fmt.Errorf("failed to attach messageID to polls, rollingback, err=%s", err)
+			return messageResponse, fmt.Errorf("failed to attach messageID to polls, rollingback, err=%s", err)
 		}
 		polls := tx.Create(createMessagePollModelInstances)
 		if polls.Error != nil {
 			tx.Rollback()
-			return 0, fmt.Errorf("failed to create message polls in database, rollingback, err=%s", polls.Error)
+			return messageResponse, fmt.Errorf("failed to create message polls in database, rollingback, err=%s", polls.Error)
 		}
 		if int(polls.RowsAffected) != len(createMessagePollModelInstances) {
 			tx.Rollback()
-			return 0, errors.New("failed to create all message polls in database, rollingback")
+			return messageResponse, errors.New("failed to create all message polls in database, rollingback")
 		}
 	}
 
 	chatroom := tx.Model(&models.Chatroom{}).Where("id = ?", createMessageModelInstance.CardID).Update("updated_at", time.Now().UnixMilli())
 	if chatroom.Error != nil {
 		tx.Rollback()
-		return 0, fmt.Errorf("failed to update chatroom in database, rollingback, err=%s", chatroom.Error)
+		return messageResponse, fmt.Errorf("failed to update chatroom in database, rollingback, err=%s", chatroom.Error)
 	}
 	if int(chatroom.RowsAffected) != 1 {
 		tx.Rollback()
-		return 0, errors.New("failed to update chatroom in database, rollingback")
+		return messageResponse, errors.New("failed to update chatroom in database, rollingback")
 	}
 
 	tx.Commit()
 
-	return messageID, nil
+	messageResponse.Message = createMessageModelInstance
+	messageResponse.Attachments = &createMessageAttachmentModelInstances
+	messageResponse.Polls = &createMessagePollModelInstances
+	messageResponse.Widget = swarmWidgetResponse
+
+	return messageResponse, nil
 }
 
 func updateAttachmentsWithMessageID(createMessageAttachmentModelInstances []models.MessageAttachment, messageID int) ([]models.MessageAttachment, error) {

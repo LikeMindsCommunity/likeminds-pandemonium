@@ -44,10 +44,19 @@ type CreateMessageRequest struct {
 }
 
 type CreateMessageResponse struct {
-	HTTPStatusCode int             `json:"http_status_code"`
-	Success        bool            `json:"success"`
-	Message        *models.Message `json:"message"`
-	Error          string          `json:"error"`
+	HTTPStatusCode int              `json:"http_status_code"`
+	Success        bool             `json:"success"`
+	Data           *MessageResponse `json:"data"`
+	Error          string           `json:"error"`
+}
+
+type MessageResponse struct {
+	Message        *models.Message             `json:"message"`
+	Attachments    *[]models.MessageAttachment `json:"attachments"`
+	Polls          *[]models.MessagePoll       `json:"polls"`
+	RepliedMessage *models.Message             `json:"message_replied"`
+	Widget         *SwarmWidgetResponse        `json:"widget"`
+	User           *models.UserInfo            `json:"user"`
 }
 
 type PollObject struct {
