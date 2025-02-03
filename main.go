@@ -37,11 +37,11 @@ func main() {
 	router.GET(constant.DeliveryReport, pubsub.DeliveryReportHandler)
 
 	// start server
-	log.Fatal(router.Run(common.GoDotEnvVariable("Ws_SERVER_PORT")))
+	log.Fatal(router.Run(common.GoDotEnvVariable(common.DotEnvVarWsServerPort)))
 }
 
 // initGin to initialise Gin network module
 func initGin() {
-	gin.SetMode(common.GoDotEnvVariable("GIN_MODE"))
+	gin.SetMode(common.GoDotEnvVariable(common.DotEnvVarGinMode))
 	router = gin.Default()
 }

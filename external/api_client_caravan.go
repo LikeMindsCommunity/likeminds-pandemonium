@@ -17,7 +17,7 @@ type APIClientCaravan struct {
 // NewAPIClient initializes a new API client instance
 func NewAPIClientCaravan() *APIClientCaravan {
 	return &APIClientCaravan{
-		BaseURL: common.GoDotEnvVariable("CARAVAN_BASE_URL"),
+		BaseURL: common.GoDotEnvVariable(common.DotEnvVarBaseUrlCaravan),
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},

@@ -81,3 +81,16 @@ const (
 const (
 	DeliveryReportTTL = 7 * 24 * time.Hour // 7 days TTL for delivery reports
 )
+
+const (
+	DotEnvVarWsServerPort         = "Ws_SERVER_PORT"
+	DotEnvVarGinMode              = "GIN_MODE"
+	DotEnvVarPostgresHost         = "POSTGRES_HOST"
+	DotEnvVarPostgresPort         = "POSTGRES_PORT"
+	DotEnvVarPostgresUser         = "POSTGRES_USER"
+	DotEnvVarPostgresUserPassword = "POSTGRES_USER_PASSWORD"
+	DotEnvVarPostgresDatabaseName = "POSTGRES_DATABASE_NAME"
+	DotEnvVarBaseUrlCaravan       = "CARAVAN_BASE_URL"
+	DotEnvVarBaseUrlSwarm         = "SWARM_BASE_URL"
+	DotEnvVarCacheRedisDsn        = "REDIS_DSN"
+)

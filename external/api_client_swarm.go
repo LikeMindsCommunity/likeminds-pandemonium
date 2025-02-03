@@ -24,7 +24,7 @@ type APIResponseSwarm struct {
 // NewAPIClient initializes a new API client instance
 func NewAPIClientSwarm() *APIClientSwarm {
 	return &APIClientSwarm{
-		BaseURL: common.GoDotEnvVariable("SWARM_BASE_URL"),
+		BaseURL: common.GoDotEnvVariable(common.DotEnvVarBaseUrlSwarm),
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},

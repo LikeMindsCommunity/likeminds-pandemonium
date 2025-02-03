@@ -11,11 +11,11 @@ import (
 
 func ConnectPostgres() *gorm.DB {
 
-	host := common.GoDotEnvVariable("POSTGRES_HOST")
-	port := common.GoDotEnvVariable("POSTGRES_PORT")
-	user := common.GoDotEnvVariable("POSTGRES_USER")
-	password := common.GoDotEnvVariable("POSTGRES_USER_PASSWORD")
-	database := common.GoDotEnvVariable("POSTGRES_DATABASE_NAME")
+	host := common.GoDotEnvVariable(common.DotEnvVarPostgresHost)
+	port := common.GoDotEnvVariable(common.DotEnvVarPostgresPort)
+	user := common.GoDotEnvVariable(common.DotEnvVarPostgresUser)
+	password := common.GoDotEnvVariable(common.DotEnvVarPostgresUserPassword)
+	database := common.GoDotEnvVariable(common.DotEnvVarPostgresDatabaseName)
 	sslMode := "disable"
 	timeZone := "Asia/Kolkata"
 
