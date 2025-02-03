@@ -10,6 +10,7 @@ import (
 	"likeminds-pandemonium/api/utilities"
 	"likeminds-pandemonium/external"
 	"log"
+	"net/http"
 	"regexp"
 	"slices"
 	"strconv"
@@ -546,7 +547,7 @@ func CreateMessageCaravanTasks(
 }
 
 func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) {
-	createMessageResponse.HTTPStatusCode = constant.HTTPResponseCodeOK
+	createMessageResponse.HTTPStatusCode = http.StatusOK
 	createMessageResponse.Success = true
 	createMessageResponse.Data = messageResponse
 	createMessageResponse.Error = ""

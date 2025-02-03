@@ -1,5 +1,7 @@
 package constant
 
+import "net/http"
+
 type APIError struct {
 	HTTPStatusCode int   `json:"http_status_code"`
 	ErrorMessage   error `json:"error_message"`
@@ -11,21 +13,21 @@ func (apiError *APIError) Error() string {
 
 func APIErrorBadRequest(err error) *APIError {
 	return &APIError{
-		HTTPStatusCode: HTTPResponseCodeBadRequest,
+		HTTPStatusCode: http.StatusBadRequest,
 		ErrorMessage:   err,
 	}
 }
 
 func APIErrorForbidden(err error) *APIError {
 	return &APIError{
-		HTTPStatusCode: HTTPResponseCodeForbidden,
+		HTTPStatusCode: http.StatusForbidden,
 		ErrorMessage:   err,
 	}
 }
 
 func APIErrorInternalServerError(err error) *APIError {
 	return &APIError{
-		HTTPStatusCode: HTTPResponseCodeInternalServerError,
+		HTTPStatusCode: http.StatusInternalServerError,
 		ErrorMessage:   err,
 	}
 }
