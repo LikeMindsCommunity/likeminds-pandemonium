@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/common"
 	"log"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var ctx = context.Background()
@@ -15,7 +16,7 @@ var ctx = context.Background()
 // InitRedisClient creates a new PublishWithMethod Client
 func InitRedisClient() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:     common.GoDotEnvVariable("REDIS_DSN"),
+		Addr:     common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})

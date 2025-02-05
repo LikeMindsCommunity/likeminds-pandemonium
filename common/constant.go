@@ -3,14 +3,17 @@ package common
 import "time"
 
 const (
-	RedisClient                  = "redis_client"
-	ReadBufferSizeDefault        = 4096
-	WriteBufferSizeDefault       = 4096
-	ParamTopic                   = "topic"
-	ParamTopicMessageType        = "topic_message_type"
-	TopicTypeChatroom            = "chatroom"
-	TopicTypeCommunity           = "community"
-	TopicMessageTypeConversation = "conversation"
+	RedisClient                                = "redis_client"
+	PostgresClient                             = "postgres_client"
+	ReadBufferSizeDefault                      = 4096
+	WriteBufferSizeDefault                     = 4096
+	ParamTopic                                 = "topic"
+	ParamTopicMessageType                      = "topic_message_type"
+	TopicTypeChatroom                          = "chatroom"
+	TopicTypeCommunity                         = "community"
+	TopicMessageTypeConversation               = "conversation"
+	TopicMessageTypeCreateConversationRequest  = "message.create.request"
+	TopicMessageTypeCreateConversationResponse = "message.create.response"
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer
@@ -72,9 +75,22 @@ const (
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
-	ErrorConversationIDsInvalid  = "invalid conversation IDs in request"
+	ErrorConversationIDMissing   = "conversation ID is missing in request"
 )
 
 const (
 	DeliveryReportTTL = 7 * 24 * time.Hour // 7 days TTL for delivery reports
+)
+
+const (
+	DotEnvVarWsServerPort         = "Ws_SERVER_PORT"
+	DotEnvVarGinMode              = "GIN_MODE"
+	DotEnvVarPostgresHost         = "POSTGRES_HOST"
+	DotEnvVarPostgresPort         = "POSTGRES_PORT"
+	DotEnvVarPostgresUser         = "POSTGRES_USER"
+	DotEnvVarPostgresUserPassword = "POSTGRES_USER_PASSWORD"
+	DotEnvVarPostgresDatabaseName = "POSTGRES_DATABASE_NAME"
+	DotEnvVarBaseUrlCaravan       = "CARAVAN_BASE_URL"
+	DotEnvVarBaseUrlSwarm         = "SWARM_BASE_URL"
+	DotEnvVarCacheRedisDsn        = "REDIS_DSN"
 )

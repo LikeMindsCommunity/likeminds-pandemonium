@@ -15,13 +15,6 @@ import (
 	"time"
 )
 
-// DeliveryReport struct that holds the delivery report data to be saved in Redis
-type DeliveryReport struct {
-	Timestamp      int64       `json:"timestamp"`
-	ConversationID interface{} `json:"conversation_id,omitempty"`
-	UserUUID       interface{} `json:"user_uuid"`
-}
-
 func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData []byte) error {
 	var conversationResponse models.ConversationResponse
 	if err := json.Unmarshal(rawData, &conversationResponse); err != nil {

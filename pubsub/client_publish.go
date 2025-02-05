@@ -3,13 +3,14 @@ package pubsub
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
 	"likeminds-pandemonium/ws"
 	"log"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 func Publish(c *gin.Context) {
@@ -60,7 +61,7 @@ func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string
 	}
 
 	redisClient := GetRedisClientFromContext(c)
-	
+
 	//update sent delivery report when message is received in chatroom topic
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 	if toUpdateSentDR {
@@ -82,9 +83,9 @@ func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 }
 
 type PublishDeliveredDR struct {
-	MinTimestamp string `json:"min_timestamp"`
-	MaxTimestamp string `json:"max_timestamp"`
-	CommunityID  string `json:"community_id"`
+	MinTimestamp string      `json:"min_timestamp"`
+	MaxTimestamp string      `json:"max_timestamp"`
+	CommunityID  interface{} `json:"community_id"`
 }
 
 func updateDeliveredDROnPublish(c *gin.Context, topic string) {
@@ -148,7 +149,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		senderUUID, _ := conversationMap["sender_uuid"].(string)
 
 		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, topic, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
 			log.Println(err)
 		}
 	}

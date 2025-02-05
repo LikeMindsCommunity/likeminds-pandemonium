@@ -11,6 +11,26 @@ const (
 )
 
 const (
-	HeadersMemberID = "x-member-id"
-	HeadersDeviceID = "x-device-id"
+	HeadersMemberID     = "x-member-id"
+	HeadersApiKey       = "x-api-key"
+	HeadersDeviceID     = "x-device-id"
+	HeadersSDKSource    = "x-sdk-source"
+	HeadersPlatformCode = "x-platform-code"
+	HeadersVersionCode  = "x-version-code"
+	HeadersApiVersion   = "x-api-version"
+	HeadersPlatformType = "x-platform-type"
 )
+
+const (
+	PlatformTypePandemoniumService = "pandemonium-service"
+)
+
+type ApiHeaders struct {
+	HeadersMemberID     string `json:"x-member-id,omitempty"`
+	HeadersApiKey       string `json:"x-api-key,omitempty"`
+	HeadersDeviceID     string `json:"x-device-id,omitempty"`
+	HeadersPlatformCode string `json:"x-platform-code,omitempty"`
+	HeadersVersionCode  string `json:"x-version-code,omitempty"`
+	HeadersApiVersion   string `json:"x-api-version,omitempty"`
+	HeadersPlatformType string `json:"x-platform-type,omitempty"`
+}
