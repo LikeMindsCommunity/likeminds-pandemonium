@@ -3,6 +3,7 @@ package main
 import (
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/database"
 	"likeminds-pandemonium/middleware"
 	"likeminds-pandemonium/pubsub"
 	"likeminds-pandemonium/web"
@@ -24,6 +25,7 @@ const (
 func main() {
 	initGin()
 	redisClient := pubsub.InitRedisClient()
+	database.Postgres = database.ConnectPostgres()
 	wsServerParent := ws.NewWsServerParent()
 	router.Use(middleware.ApiMiddleware(redisClient, wsServerParent))
 
@@ -35,11 +37,11 @@ func main() {
 	router.GET(constant.DeliveryReport, pubsub.DeliveryReportHandler)
 
 	// start server
-	log.Fatal(router.Run(common.GoDotEnvVariable("Ws_SERVER_PORT")))
+	log.Fatal(router.Run(common.GoDotEnvVariable(common.DotEnvVarWsServerPort)))
 }
 
 // initGin to initialise Gin network module
 func initGin() {
-	gin.SetMode(common.GoDotEnvVariable("GIN_MODE"))
+	gin.SetMode(common.GoDotEnvVariable(common.DotEnvVarGinMode))
 	router = gin.Default()
 }

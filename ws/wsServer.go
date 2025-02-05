@@ -3,11 +3,13 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"likeminds-pandemonium/common"
+
 	"log"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 // Client represents the websocket client connected with the server
@@ -20,8 +22,18 @@ type Client struct {
 	UUID string
 	// Device ID of user
 	DeviceID string
+	// api key of community
+	ApiKey string
 	// Topic on which client is connected
 	Topic string
+	// SDK source of the user
+	SDKSource string
+	// Platform Code of user
+	PlatformCode string
+	// Version Code of user
+	VersionCode int
+	// Api Version
+	ApiVersion int
 }
 
 // WsServer represents web socket server
@@ -36,13 +48,18 @@ type WsServerParent struct {
 }
 
 // NewClient creates new client which will be added to WsServer
-func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, deviceID string, topic string) *Client {
+func NewClient(conn *websocket.Conn, wsServer *WsServer, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) *Client {
 	return &Client{
-		Conn:     conn,
-		WsServer: wsServer,
-		UUID:     UUID,
-		DeviceID: deviceID,
-		Topic:    topic,
+		Conn:         conn,
+		WsServer:     wsServer,
+		UUID:         UUID,
+		ApiKey:       apiKey,
+		DeviceID:     deviceID,
+		Topic:        topic,
+		SDKSource:    sdkSource,
+		PlatformCode: platformCode,
+		VersionCode:  versionCode,
+		ApiVersion:   apiVersion,
 	}
 }
 
