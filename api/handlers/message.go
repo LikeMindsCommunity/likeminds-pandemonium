@@ -68,7 +68,7 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 
 	var isGuest bool
 	if requestContext.Chatroom.AccessWithoutSubscription &&
-		collabcardState.ID == 0 &&
+		collabcardState == nil &&
 		!isMemberVerifiedInCommunity {
 		isGuest = true
 	}

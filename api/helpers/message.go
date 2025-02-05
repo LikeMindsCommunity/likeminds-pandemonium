@@ -305,6 +305,10 @@ func FillCreateMessageModelInstance(
 	createMessageModelInstance.Platform = &platformCode
 
 	if requestContext.OriginalMessage != nil {
+		createMessageModelInstance.ReplyID = &requestContext.OriginalMessage.ID
+	}
+
+	if requestContext.OriginalMessage != nil {
 		createMessageRequest.RepliedConversationId = requestContext.OriginalMessage.ID
 	}
 

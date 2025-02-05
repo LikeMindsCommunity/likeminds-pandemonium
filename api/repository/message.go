@@ -49,6 +49,8 @@ func CreateMessage(
 	messageResponse := &requestresponse.MessageResponse{}
 	var swarmWidgetResponse *requestresponse.SwarmWidgetResponse = nil
 
+	updateCreateMessaModelInstanceForAttachments(createMessageModelInstance, createMessageAttachmentModelInstances)
+
 	tx := NewMessageRepository().messageDatabase.Begin()
 
 	message := tx.Create(createMessageModelInstance)
@@ -84,6 +86,7 @@ func CreateMessage(
 			tx.Rollback()
 			return messageResponse, errors.New("failed to update message widget in database, rollingback")
 		}
+		createMessageModelInstance.WidgetID = swarmWidgetResponse.ID
 	}
 
 	if len(createMessageAttachmentModelInstances) > 0 {
@@ -138,6 +141,18 @@ func CreateMessage(
 	messageResponse.Widget = swarmWidgetResponse
 
 	return messageResponse, nil
+}
+
+func updateCreateMessaModelInstanceForAttachments(createMessageModelInstance *models.Message, createMessageAttachmentModelInstances []models.MessageAttachment) {
+	if len(createMessageAttachmentModelInstances) == 0 {
+		return
+	}
+
+	createMessageModelInstance.HasFiles = true
+
+	// transaction will rollback if fails to create all attachments
+	createMessageModelInstance.AttachmentsUploaded = true
+	createMessageModelInstance.AttachmentCount = len(createMessageAttachmentModelInstances)
 }
 
 func updateAttachmentsWithMessageID(createMessageAttachmentModelInstances []models.MessageAttachment, messageID int) ([]models.MessageAttachment, error) {

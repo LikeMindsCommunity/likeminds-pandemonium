@@ -13,7 +13,7 @@ type Message struct {
 	RemoveID               *int    `gorm:"column:remove_id" json:"remove_id,omitempty"`
 	IsDeleted              bool    `gorm:"column:is_deleted;not null" json:"is_deleted"`
 	IsEdited               bool    `gorm:"column:is_edited;not null" json:"is_edited"`
-	ReplyID                *int    `gorm:"column:reply_id" json:"reply_id,omitempty"`
+	ReplyID                *int64  `gorm:"column:reply_id" json:"reply_id,omitempty"`
 	InternalLink           *string `gorm:"column:internal_link;type:text" json:"internal_link,omitempty"`
 	PreviewChatroomID      *int    `gorm:"column:preview_chatroom_id" json:"preview_chatroom_id,omitempty"`
 	PreviewCommunityID     *int    `gorm:"column:preview_community_id" json:"preview_community_id,omitempty"`
