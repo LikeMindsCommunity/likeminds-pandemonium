@@ -80,7 +80,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	}
 
 	// Construct the field for the delivered report using the new key format.
-	deliveredUUIDField := fmt.Sprintf(common.DRUserPrefix, deliveredUUID)
+	deliveredUUIDField := fmt.Sprintf(common.DRUserDeliveredPrefix, deliveredUUID)
 
 	// Check if the delivered eport for this user already exists.
 	existingDeliveredReport, err := FetchFieldFromHashSet(redisClient, conversationKey, deliveredUUIDField)
@@ -243,9 +243,9 @@ func extractDeliveredDRFields(data map[string]string) map[string]interface{} {
 
 	// Iterate through all fields in the Redis hash and find delivered report fields.
 	for key, value := range data {
-		if strings.HasPrefix(key, common.DRUser) {
+		if strings.HasPrefix(key, common.DRUserDelivered) {
 			// Remove the prefix from the key before adding it to the map.
-			strippedKey := strings.TrimPrefix(key, common.DRUser)
+			strippedKey := strings.TrimPrefix(key, common.DRUserDelivered)
 			deliveredDR[strippedKey] = value
 		}
 	}
