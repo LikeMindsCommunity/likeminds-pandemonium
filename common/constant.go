@@ -93,4 +93,6 @@ const (
 	DotEnvVarBaseUrlCaravan       = "CARAVAN_BASE_URL"
 	DotEnvVarBaseUrlSwarm         = "SWARM_BASE_URL"
 	DotEnvVarCacheRedisDsn        = "REDIS_DSN"
+	EnvServerEnviornment          = "SERVER_ENVIRONMENT"
+	DotEnvVarCacheRedisPassword   = "REDIS_PASSWORD"
 )

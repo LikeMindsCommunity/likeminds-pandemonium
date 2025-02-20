@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"likeminds-pandemonium/common"
@@ -15,6 +16,15 @@ var ctx = context.Background()
 
 // InitRedisClient creates a new PublishWithMethod Client
 func InitRedisClient() *redis.Client {
+	if common.GoDotEnvVariable(common.EnvServerEnviornment) == "load" {
+		return redis.NewClient(&redis.Options{
+			Addr:      common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
+			Password:  common.GoDotEnvVariable(common.DotEnvVarCacheRedisPassword),
+			TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12},
+			DB:        0, // use default DB
+		})
+	}
+
 	return redis.NewClient(&redis.Options{
 		Addr:     common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
 		Password: "", // no password set
