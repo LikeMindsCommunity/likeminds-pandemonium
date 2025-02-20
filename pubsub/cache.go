@@ -16,20 +16,29 @@ var ctx = context.Background()
 
 // InitRedisClient creates a new PublishWithMethod Client
 func InitRedisClient() *redis.Client {
+	var redisClient *redis.Client = nil
+
 	if common.GoDotEnvVariable(common.EnvServerEnviornment) == "load" {
-		return redis.NewClient(&redis.Options{
+		redisClient = redis.NewClient(&redis.Options{
 			Addr:      common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
 			Password:  common.GoDotEnvVariable(common.DotEnvVarCacheRedisPassword),
 			TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12},
 			DB:        0, // use default DB
 		})
+	} else {
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
+			Password: "", // no password set
+			DB:       0,  // use default DB
+		})
 	}
 
-	return redis.NewClient(&redis.Options{
-		Addr:     common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
+	ctx := context.Background()
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Fatalf("failed to connect redis, redis=%s, err=%s", redisClient.Options().Addr, err)
+	}
+
+	return redisClient
 }
 
 // PublishMessageToRedis is a wrapper method for publishing a message to a Redis topic
