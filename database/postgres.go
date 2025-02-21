@@ -16,7 +16,7 @@ func ConnectPostgres() *gorm.DB {
 	user := common.GoDotEnvVariable(common.DotEnvVarPostgresUser)
 	password := common.GoDotEnvVariable(common.DotEnvVarPostgresUserPassword)
 	database := common.GoDotEnvVariable(common.DotEnvVarPostgresDatabaseName)
-	sslMode := "disable"
+	sslMode := "allow"
 	timeZone := "Asia/Kolkata"
 
 	dsn := fmt.Sprintf("host=%s port=%s user=%s  password=%s dbname=%s  sslmode=%s TimeZone=%s",
