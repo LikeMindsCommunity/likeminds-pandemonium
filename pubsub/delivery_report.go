@@ -7,8 +7,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
+	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/common"
-	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
 	"log"
 	"strings"
@@ -16,23 +16,27 @@ import (
 )
 
 func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData []byte) error {
-	var conversationResponse models.ConversationResponse
-	if err := json.Unmarshal(rawData, &conversationResponse); err != nil {
+	var createMessagePSResponse requestresponse.PSResponse
+	if err := json.Unmarshal(rawData, &createMessagePSResponse); err != nil {
+		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
+	}
+	var createMessageResponse requestresponse.CreateMessageResponse
+	if err := json.Unmarshal([]byte(createMessagePSResponse.RawData), &createMessageResponse); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
-	conversationID := conversationResponse.Conversation.ID
-	chatroomID := conversationResponse.Conversation.ChatroomID
-	userUUID := conversationResponse.Conversation.Member.UUID
-	participantsCount := conversationResponse.TotalParticipantsCount
-	communityID := conversationResponse.Conversation.CommunityID
+	conversationID := createMessageResponse.Data.Message.ID
+	chatroomID := createMessageResponse.Data.Message.CardID
+	userUUID := *createMessageResponse.Data.User.UserUniqueID
+	participantsCount := createMessageResponse.TotalParticipantsCount
+	communityID := createMessageResponse.Data.Message.CommunityID
 
 	// Create the cache keys
 	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
 
 	// Update the cache for chatroom and conversation
-	err := SaveZSet(redisClient, chatroomKey, float64(conversationResponse.Conversation.CreatedAt), conversationKey, common.DeliveryReportTTL)
+	err := SaveZSet(redisClient, chatroomKey, float64(createMessageResponse.Data.Message.CreatedAt), conversationKey, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}

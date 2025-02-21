@@ -223,20 +223,21 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			log.Print(createConversationPSResponse)
 
 			// publish response to pubsub TopicNameChatroom
-			jsonCreateConversationResponseBytes, err := json.Marshal(createConversationPSResponse)
+			createConversationPSResponseBytes, err := json.Marshal(createConversationPSResponse)
 			if err != nil {
 				log.Printf(common.ErrorInvalidJSONFormat, err)
 				return
 			}
+
+			go updateSentDR(redisClient, wsServerParent, client.DeviceID, createConversationPSResponseBytes)
 			//todo to publish to community topic as well
-			if err := PublishMessageToRedis(redisClient, client.Topic, jsonCreateConversationResponseBytes); err != nil {
+			if err := PublishMessageToRedis(redisClient, client.Topic, createConversationPSResponseBytes); err != nil {
 				return
 			}
-			/*default:
-			// todo can be removed, please test
+		default:
 			if err := PublishMessageToRedis(redisClient, client.Topic, jsonMessage); err != nil {
 				return
-			}*/
+			}
 		}
 	}
 }
@@ -372,6 +373,12 @@ func updateReadDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsSer
 	communityID := conversationResponse.Data.Message.CommunityID
 
 	if err := UpdateReadDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, deliveredUUID, communityID); err != nil {
+		log.Println(err)
+	}
+}
+
+func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData []byte) {
+	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData); err != nil {
 		log.Println(err)
 	}
 }

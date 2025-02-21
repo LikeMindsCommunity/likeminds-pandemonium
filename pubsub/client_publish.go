@@ -10,7 +10,6 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 func Publish(c *gin.Context) {
@@ -35,52 +34,18 @@ func PublishWithMethod(c *gin.Context, method int) {
 		switch topicSplit[0] {
 		case common.TopicTypeChatroom:
 			switch topicMessageType {
-			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType, true)
 			case common.TopicMessageTypeDeliveredDR:
-				updateDeliveredDROnPublish(c, topic)
+				go updateDeliveredDROnPublish(c, topic)
 			case common.TopicMessageTypeReadDR:
-				updateReadDROnPublish(c, topic)
+				go updateReadDROnPublish(c, topic)
 			}
 
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
-			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType, false)
+			case common.TopicMessageTypeDeliveredDR:
+				go updateDeliveredDROnPublish(c, topic)
 			}
 		}
-	}
-}
-
-func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string, toUpdateSentDR bool) {
-	deviceID := c.GetHeader(constant.HeadersDeviceID)
-	rawData, _ := c.GetRawData()
-
-	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
-	responseBytes, err := json.Marshal(psResponse)
-	if err != nil {
-		return
-	}
-
-	redisClient := GetRedisClientFromContext(c)
-
-	//update sent delivery report when message is received in chatroom topic
-	wsServerParent := ws.GetWsServerParentFromContext(c)
-	if toUpdateSentDR {
-		go updateSentDR(redisClient, wsServerParent, deviceID, rawData)
-	}
-
-	// publish rawData to pubsub channel:<chatroomID>
-	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
-		api.GeneralAPIError(c, err.Error())
-		return
-	}
-	api.GenerateResponse(c, nil)
-}
-
-func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData interface{}) {
-	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
-		log.Println(err)
 	}
 }
 
