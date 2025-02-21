@@ -6,8 +6,8 @@ import (
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
 	"likeminds-pandemonium/api/handlers"
+	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/common"
-	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
 	"log"
 	"net/http"
@@ -191,38 +191,52 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			log.Printf(common.ErrorReadClientWs, err)
 			return
 		}
+		log.Printf(common.ReceivedMessageClientWs, messageType)
 
-		var jsonMessageParsed map[string]interface{}
-		err = json.Unmarshal([]byte(jsonMessage), &jsonMessageParsed)
+		var jsonMessageMap map[string]interface{}
+		err = json.Unmarshal(jsonMessage, &jsonMessageMap)
 		if err != nil {
 			log.Printf(common.ErrorInvalidJSONFormat, err)
 			return
 		}
-		if jsonMessageParsed["topic_message_type"] != nil && jsonMessageParsed["topic_message_type"] == "message.create.request" {
-			// create conversation data in database
+		topicMessageType := jsonMessageMap[common.ParamTopicMessageType]
+		switch topicMessageType {
+		case common.TopicMessageTypeCreateConversationRequest:
+			log.Println(topicMessageType)
 
-			log.Printf(common.ReceivedMessageClientWs, messageType)
-			log.Println(jsonMessageParsed["topic_message_type"])
+			participants := jsonMessageMap[common.ParamParticipantsType]
+			participantsStringList, ok := participants.([]string)
+			if !ok {
+				log.Print(common.ErrorInvalidTotalParticipantsFormat)
+				return
+			}
 
-			CreateConversationResponse := handlers.CreateMessage(jsonMessageParsed, client.UUID, client.ApiKey, client.DeviceID, client.Topic, client.SDKSource, client.PlatformCode, client.VersionCode, client.ApiVersion)
-			log.Print(CreateConversationResponse)
+			totalParticipantsCount := jsonMessageMap[common.ParamTotalParticipantsCountType]
+			totalParticipantsCountInt, ok := totalParticipantsCount.(int)
+			if !ok {
+				log.Print(common.ErrorInvalidTotalParticipantsFormat)
+				return
+			}
+
+			// Create conversation data in database
+			createConversationPSResponse := handlers.CreateMessage(jsonMessageMap, client.UUID, client.ApiKey, client.DeviceID, client.Topic, client.SDKSource, client.PlatformCode, client.VersionCode, client.ApiVersion, participantsStringList, totalParticipantsCountInt)
+			log.Print(createConversationPSResponse)
 
 			// publish response to pubsub TopicNameChatroom
-			jsonCreateConversationResponse, err := json.Marshal(CreateConversationResponse)
+			jsonCreateConversationResponseBytes, err := json.Marshal(createConversationPSResponse)
 			if err != nil {
 				log.Printf(common.ErrorInvalidJSONFormat, err)
 				return
 			}
-			if err := PublishMessageToRedis(redisClient, client.Topic, jsonCreateConversationResponse); err != nil {
+			//todo to publish to community topic as well
+			if err := PublishMessageToRedis(redisClient, client.Topic, jsonCreateConversationResponseBytes); err != nil {
 				return
 			}
-
-		} else {
-			log.Printf(common.ReceivedMessageClientWs, messageType)
-			// publish jsonMessage to pubsub TopicNameChatroom
+			/*default:
+			// todo can be removed, please test
 			if err := PublishMessageToRedis(redisClient, client.Topic, jsonMessage); err != nil {
 				return
-			}
+			}*/
 		}
 	}
 }
@@ -258,20 +272,21 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 			}
 			// Unmarshal messagePayloadByte PSResponse
 			messagePayloadByte := []byte(message.Payload)
-			var psResponse PSResponse
+			var psResponse requestresponse.PSResponse
 			if err := json.Unmarshal(messagePayloadByte, &psResponse); err != nil {
 				log.Printf(common.ErrorUnmarshalErrorJson, err)
 				return
 			}
+
 			switch psResponse.TopicMessageType {
-			case common.TopicMessageTypeConversation:
-				var conversationResponse models.ConversationResponse
+			case common.TopicMessageTypeCreateConversationResponse:
+				var conversationResponse requestresponse.CreateMessageResponse
 				if err := json.Unmarshal([]byte(psResponse.RawData), &conversationResponse); err != nil {
 					log.Printf(common.ErrorUnmarshalErrorJson, err)
 					return
 				}
 				// To not return to user who has sent the message and is on the same device. If user opts to not send device_id then we will send it to the same user as well
-				if (conversationResponse.Conversation.Member.UUID == client.UUID) &&
+				if (*conversationResponse.Data.User.UserUniqueID == client.UUID) &&
 					(client.DeviceID != "" && client.DeviceID == psResponse.DeviceID) {
 					continue
 				}
@@ -297,25 +312,8 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 					return
 				}
 				log.Println(common.ReceivedMessageRedisWs)
-				go updateDeliveredDROnSubscribe(redisClient, wsServerParent, topic, client.DeviceID, &conversationResponse, client.UUID)
-
-			case common.TopicMessageTypeCreateConversationResponse:
-				// Create NextWriter of type websocket.TextMessage
-				w, err := client.Conn.NextWriter(websocket.TextMessage)
-				if err != nil {
-					log.Printf(common.ErrorWriterOpenWs, err)
-					return
-				}
-				_, err = w.Write(messagePayloadByte)
-				if err != nil {
-					log.Printf(common.ErrorUnableToWriteWs, err)
-					return
-				}
-				if err := w.Close(); err != nil {
-					log.Printf(common.ErrorWriterCloseWs, err)
-					return
-				}
-				log.Println(common.ReceivedMessageRedisWs)
+				go updateDeliveredDROnSubscribe(redisClient, wsServerParent, &conversationResponse, client.DeviceID, client.UUID)
+				go updateReadDROnSubscribe(redisClient, wsServerParent, &conversationResponse, client.DeviceID, client.UUID)
 			}
 		}
 	}
@@ -350,18 +348,30 @@ func updateWriteDeadline(conn *websocket.Conn) {
 	}
 }
 
-func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, topic, deliveredDeviceID string, conversationResponse *models.ConversationResponse, deliveredUUID string) {
-	//todo defensive check on topic?
+func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, conversationResponse *requestresponse.CreateMessageResponse, deliveredDeviceID, deliveredUUID string) {
 	if conversationResponse == nil {
 		return
 	}
 	// Extract chatroomID and senderUUID from the conversation.
-	senderUUID := conversationResponse.Conversation.Member.UUID
-	conversationID := conversationResponse.Conversation.ID
-	chatroomID := conversationResponse.Conversation.ChatroomID
-	communityID := conversationResponse.Conversation.CommunityID
+	senderUUID := *conversationResponse.Data.User.UserUniqueID
+	conversationID := conversationResponse.Data.Message.ID
+	chatroomID := conversationResponse.Data.Message.CardID
+	communityID := conversationResponse.Data.Message.CommunityID
 
 	if err := UpdateDeliveredDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID, communityID); err != nil {
+		log.Println(err)
+	}
+}
+
+func updateReadDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsServerParent, conversationResponse *requestresponse.CreateMessageResponse, deliveredDeviceID, deliveredUUID string) {
+	if conversationResponse == nil {
+		return
+	}
+	conversationID := conversationResponse.Data.Message.ID
+	chatroomID := conversationResponse.Data.Message.CardID
+	communityID := conversationResponse.Data.Message.CommunityID
+
+	if err := UpdateReadDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, deliveredUUID, communityID); err != nil {
 		log.Println(err)
 	}
 }

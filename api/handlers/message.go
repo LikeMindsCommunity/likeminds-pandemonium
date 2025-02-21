@@ -12,7 +12,7 @@ import (
 	"log"
 )
 
-func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) requestresponse.PSResponse {
+func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int, participants []string, totalParticipantsCount int) requestresponse.PSResponse {
 
 	psResponse := &requestresponse.PSResponse{
 		DeviceID:         deviceID,
@@ -119,5 +119,5 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		)
 	})
 
-	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse)
+	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse, participants, totalParticipantsCount)
 }

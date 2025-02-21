@@ -44,10 +44,12 @@ type CreateMessageRequest struct {
 }
 
 type CreateMessageResponse struct {
-	HTTPStatusCode int              `json:"http_status_code"`
-	Success        bool             `json:"success"`
-	Data           *MessageResponse `json:"data"`
-	Error          string           `json:"error"`
+	HTTPStatusCode         int              `json:"http_status_code"`
+	Success                bool             `json:"success"`
+	Data                   *MessageResponse `json:"data"`
+	Error                  string           `json:"error"`
+	Participants           []string         `json:"participants"`
+	TotalParticipantsCount int              `json:"total_participants_count"`
 }
 
 type MessageResponse struct {

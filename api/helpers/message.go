@@ -515,8 +515,8 @@ func fillCreateMessageErrorResponse(createMessageResponse *requestresponse.Creat
 	createMessageResponse.Error = apiError.Error()
 }
 
-func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) requestresponse.PSResponse {
-	fillCreateMessageSuccessResponse(createMessageResponse, messageResponse)
+func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse, participants []string, totalParticipantsCount int) requestresponse.PSResponse {
+	fillCreateMessageSuccessResponse(createMessageResponse, messageResponse, participants, totalParticipantsCount)
 
 	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
 	if err != nil {
@@ -550,11 +550,13 @@ func CreateMessageCaravanTasks(
 	external.NewAPIClientCaravan().Post(enpoint, requestPostBody)
 }
 
-func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) {
+func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse, participants []string, totalParticipantsCount int) {
 	createMessageResponse.HTTPStatusCode = http.StatusOK
 	createMessageResponse.Success = true
 	createMessageResponse.Data = messageResponse
 	createMessageResponse.Error = ""
+	createMessageResponse.Participants = participants
+	createMessageResponse.TotalParticipantsCount = totalParticipantsCount
 }
 
 func validateWsChatroomID(chatroomID int, topic string) error {

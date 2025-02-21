@@ -251,3 +251,80 @@ func extractDeliveredDRFields(data map[string]string) map[string]interface{} {
 	}
 	return deliveredDR
 }
+
+// UpdateReadDRWithConversationID updates the delivered report in Redis and sends a payload to the conversation creator.
+func UpdateReadDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, deliveredUUID string, communityID interface{}) error {
+	// Fetch and update the dr_conversation_<conversation_id>
+	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
+	return UpdateReadDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, deliveredUUID, communityID)
+}
+
+// UpdateReadDR updates the read report in Redis and sends a payload to the conversation creator.
+func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey, readDeviceID, readUUID string, communityID interface{}) error {
+	// Fetch the conversation delivery report from Redis.
+	conversationData, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshal the fetched data into a map.
+	var conversationMap map[string]interface{}
+	if err := json.Unmarshal([]byte(conversationData), &conversationMap); err != nil {
+		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
+	}
+
+	// Extract the sender UUID from the fetched conversation data.
+	senderUUID, _ := conversationMap["sender_uuid"].(string)
+	// If the message sender is the same as the message read user, no need to update
+	if senderUUID == readUUID {
+		return nil
+	}
+
+	// Construct the field for the read report using the new key format.
+	readUUIDField := fmt.Sprintf(common.DRUserReadPrefix, readUUID)
+	// Check if the read report for this user already exists.
+	existingReadReport, err := FetchFieldFromHashSet(redisClient, conversationKey, readUUIDField)
+
+	// If the read report already exists, no need to update.
+	if existingReadReport != "" {
+		return nil
+	}
+
+	// Set the current timestamp as the read timestamp.
+	currentTimestamp := time.Now().UnixMilli()
+	// Update the Redis key with the new read report.
+	err = SaveHashSet(redisClient, conversationKey, readUUIDField, currentTimestamp, common.DeliveryReportTTL)
+	if err != nil {
+		return err
+	}
+
+	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
+	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
+	// Send the updated read report to the conversation creator's connection.
+	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
+	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, senderUUID)
+	finalClient := clientConnectedToChatroom
+	if finalClient == nil {
+		finalClient = clientConnectedToCommunity
+	}
+	if finalClient != nil {
+		// Include the new read report field in the response.
+		conversationMap[readUUIDField] = currentTimestamp
+
+		// Marshal the updated read report for the response.
+		readReportBytes, err := json.Marshal(conversationMap)
+		if err != nil {
+			return err
+		}
+
+		// Create the response payload for the read report.
+		readReportResponse := NewResponse(readDeviceID, common.TopicMessageTypeReadDR, string(readReportBytes))
+
+		// Send the payload via WebSocket to the conversation creator.
+		if err := finalClient.SendPayloadToClientConnection(readReportResponse); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
