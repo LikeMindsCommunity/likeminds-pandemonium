@@ -81,6 +81,7 @@ const (
 	ErrorTopicMissing            = "topic is missing from request"
 	ErrorTopicInvalid            = "invalid format of topic"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
+	ErrorSenderUUIDMissing       = "sender uuids is missing in cache key: %v"
 	ErrorConversationIDMissing   = "conversation ID is missing in request"
 )
 

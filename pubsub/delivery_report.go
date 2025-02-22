@@ -7,45 +7,27 @@ import (
 	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
-	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
 	"log"
 	"strings"
 	"time"
 )
 
-func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData []byte) error {
-	var createMessagePSResponse requestresponse.PSResponse
-	if err := json.Unmarshal(rawData, &createMessagePSResponse); err != nil {
-		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
-	}
-	var createMessageResponse requestresponse.CreateMessageResponse
-	if err := json.Unmarshal([]byte(createMessagePSResponse.RawData), &createMessageResponse); err != nil {
-		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
-	}
-
-	conversationID := createMessageResponse.Data.Message.ID
-	chatroomID := createMessageResponse.Data.Message.CardID
-	userUUID := *createMessageResponse.Data.User.UserUniqueID
-	participantsCount := createMessageResponse.TotalParticipantsCount
-	communityID := createMessageResponse.Data.Message.CommunityID
-
+func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, senderUUID, senderDeviceID string, chatroomID, communityID int, conversationID int64, conversationCreatedAt float64, participantsCount int) error {
 	// Create the cache keys
 	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
 
 	// Update the cache for chatroom and conversation
-	err := SaveZSet(redisClient, chatroomKey, float64(createMessageResponse.Data.Message.CreatedAt), conversationKey, common.DeliveryReportTTL)
+	err := SaveZSet(redisClient, chatroomKey, conversationCreatedAt, conversationKey, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
 
-	sentDRValue := map[string]interface{}{
-		common.DeliveryCount: participantsCount,
-		common.SenderUUID:    userUUID,
-	}
-	err = SaveHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix, sentDRValue, common.DeliveryReportTTL)
+	var conversationMetaCache = models.ConversationMetaCache{DeliveryCount: participantsCount, SenderUUID: senderUUID}
+	err = SaveHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix, conversationMetaCache, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
@@ -53,14 +35,20 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
 	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
 	// Send the updated delivered report to the conversation creator's connection.
-	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, userUUID)
-	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, userUUID)
+	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
+	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, senderUUID)
 	finalClient := clientConnectedToChatroom
 	if finalClient == nil {
 		finalClient = clientConnectedToCommunity
 	}
 	if finalClient != nil {
-		payload := NewResponse(deviceID, common.TopicMessageTypeSentDR, string(rawData))
+		// Marshal the updated delivered report for the response.
+		sentReportBytes, err := json.Marshal(conversationMetaCache)
+		if err != nil {
+			return err
+		}
+
+		payload := NewPSResponse(senderDeviceID, common.TopicMessageTypeSentDR, string(sentReportBytes))
 		if err := finalClient.SendPayloadToClientConnection(payload); err != nil {
 			return err
 		}
@@ -70,14 +58,31 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 }
 
 // UpdateDeliveredDRWithConversationID updates the delivered report in Redis and sends a payload to the conversation creator.
-func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID, conversationID interface{}, deliveredDeviceID, senderUUID, deliveredUUID string, communityID interface{}) error {
+func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, communityID, chatroomID, conversationID interface{}, deliveredUUID, deliveredDeviceID string) error {
 	// Fetch and update the dr_conversation_<conversation_id>
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
-	return UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, communityID)
+	return UpdateDeliveredDR(redisClient, wsServerParent, communityID, chatroomID, conversationKey, deliveredUUID, deliveredDeviceID)
 }
 
 // UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
-func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey string, deliveredDeviceID, senderUUID, deliveredUUID string, communityID interface{}) error {
+func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, communityID, chatroomID interface{}, conversationKey, deliveredUUID, deliveredDeviceID string) error {
+	// Fetch the conversation meta field from Redis.
+	conversationMetaCacheValue, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshal the fetched data into a map.
+	var conversationMetaCache models.ConversationMetaCache
+	if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
+		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
+	}
+
+	// Extract the sender UUID from the fetched conversation data.
+	senderUUID := conversationMetaCache.SenderUUID
+	if senderUUID == "" {
+		return fmt.Errorf(common.ErrorSenderUUIDMissing, conversationKey)
+	}
 	// If the message sender is the same as the message delivered user, no need to update
 	if senderUUID == deliveredUUID {
 		return nil
@@ -85,8 +90,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 
 	// Construct the field for the delivered report using the new key format.
 	deliveredUUIDField := fmt.Sprintf(common.DRUserDeliveredPrefix, deliveredUUID)
-
-	// Check if the delivered eport for this user already exists.
+	// Check if the delivered report for this user already exists.
 	existingDeliveredReport, err := FetchFieldFromHashSet(redisClient, conversationKey, deliveredUUIDField)
 
 	// If the delivered report already exists, no need to update.
@@ -112,32 +116,22 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 		finalClient = clientConnectedToCommunity
 	}
 	if finalClient != nil {
-		// Fetch the existing conversation metadata to include in the delivered report.
-		conversationMeta, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
-		if err != nil || conversationMeta == "" {
-			return fmt.Errorf("failed to fetch conversation meta: %v", err)
-		}
-
-		// Unmarshal the conversation metadata into a map.
-		var deliveredReport map[string]interface{}
-		if err := json.Unmarshal([]byte(conversationMeta), &deliveredReport); err != nil {
-			return fmt.Errorf("failed to unmarshal conversation meta: %v", err)
-		}
-
+		var deliveredReportMap map[string]interface{}
+		deliveredReportMap[common.DRConversationMetaPrefix] = conversationMetaCache
 		// Include the new delivered report field in the response.
-		deliveredReport[deliveredUUIDField] = currentTimestamp
+		deliveredReportMap[deliveredUUIDField] = currentTimestamp
 
 		// Marshal the updated delivered report for the response.
-		deliveredReportBytes, err := json.Marshal(deliveredReport)
+		deliveredReportMapBytes, err := json.Marshal(deliveredReportMap)
 		if err != nil {
 			return err
 		}
 
 		// Create the response payload for the delivered report.
-		deliveredReportResponse := NewResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, string(deliveredReportBytes))
+		deliveredReportPSResponse := NewPSResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, string(deliveredReportMapBytes))
 
 		// Send the payload via WebSocket to the conversation creator.
-		if err := finalClient.SendPayloadToClientConnection(deliveredReportResponse); err != nil {
+		if err := finalClient.SendPayloadToClientConnection(deliveredReportPSResponse); err != nil {
 			return err
 		}
 	}
@@ -213,23 +207,22 @@ func DeliveryReportHandler(c *gin.Context) {
 		}
 
 		// Extract the "dr_conversation_meta" field.
-		metaData, ok := data[common.DRConversationMetaPrefix]
-		if !ok || metaData == "" {
+		conversationMetaCacheValue, ok := data[common.DRConversationMetaPrefix]
+		if !ok || conversationMetaCacheValue == "" {
 			log.Printf("Missing or empty dr_conversation_meta for conversation %s", conversationID)
 			continue
 		}
 
 		// Unmarshal the metadata field.
-		var metaMap map[string]interface{}
-		if err := json.Unmarshal([]byte(metaData), &metaMap); err != nil {
+		var conversationMetaCache models.ConversationMetaCache
+		if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
 			log.Printf("Error unmarshalling conversation meta for %s: %v", conversationID, err)
 			continue
 		}
 
 		// Add the conversation data to the delivery report map directly.
 		deliveryReport[conversationID] = map[string]interface{}{
-			common.DeliveryCount:               metaMap[common.DeliveryCount],
-			common.SenderUUID:                  metaMap[common.SenderUUID],
+			common.DRConversationMetaPrefix:    conversationMetaCache,
 			common.TopicMessageTypeDeliveredDR: extractDeliveredDRFields(data),
 		}
 	}
@@ -266,19 +259,23 @@ func UpdateReadDRWithConversationID(redisClient *redis.Client, wsServerParent *w
 // UpdateReadDR updates the read report in Redis and sends a payload to the conversation creator.
 func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, chatroomID interface{}, conversationKey, readDeviceID, readUUID string, communityID interface{}) error {
 	// Fetch the conversation delivery report from Redis.
-	conversationData, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
+	conversationMetaCacheValue, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
 	if err != nil {
 		return err
 	}
 
 	// Unmarshal the fetched data into a map.
-	var conversationMap map[string]interface{}
-	if err := json.Unmarshal([]byte(conversationData), &conversationMap); err != nil {
+	var conversationMetaCache models.ConversationMetaCache
+	if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
 	// Extract the sender UUID from the fetched conversation data.
-	senderUUID, _ := conversationMap["sender_uuid"].(string)
+	senderUUID := conversationMetaCache.SenderUUID
+	if senderUUID == "" {
+		return fmt.Errorf(common.ErrorSenderUUIDMissing, conversationKey)
+	}
+
 	// If the message sender is the same as the message read user, no need to update
 	if senderUUID == readUUID {
 		return nil
@@ -312,20 +309,23 @@ func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		finalClient = clientConnectedToCommunity
 	}
 	if finalClient != nil {
+		var readReportMap map[string]interface{}
+		readReportMap[common.DRConversationMetaPrefix] = conversationMetaCache
+
 		// Include the new read report field in the response.
-		conversationMap[readUUIDField] = currentTimestamp
+		readReportMap[readUUIDField] = currentTimestamp
 
 		// Marshal the updated read report for the response.
-		readReportBytes, err := json.Marshal(conversationMap)
+		readReportBytes, err := json.Marshal(readReportMap)
 		if err != nil {
 			return err
 		}
 
 		// Create the response payload for the read report.
-		readReportResponse := NewResponse(readDeviceID, common.TopicMessageTypeReadDR, string(readReportBytes))
+		readReportPSResponse := NewPSResponse(readDeviceID, common.TopicMessageTypeReadDR, string(readReportBytes))
 
 		// Send the payload via WebSocket to the conversation creator.
-		if err := finalClient.SendPayloadToClientConnection(readReportResponse); err != nil {
+		if err := finalClient.SendPayloadToClientConnection(readReportPSResponse); err != nil {
 			return err
 		}
 	}

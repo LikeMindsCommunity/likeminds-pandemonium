@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"encoding/json"
 	"fmt"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
@@ -35,17 +34,18 @@ func PublishWithMethod(c *gin.Context, method int) {
 		case common.TopicTypeChatroom:
 			switch topicMessageType {
 			case common.TopicMessageTypeDeliveredDR:
-				go updateDeliveredDROnPublish(c, topic)
+				go updateDeliveredDROnPublish(c, topicSplit)
 			case common.TopicMessageTypeReadDR:
-				go updateReadDROnPublish(c, topic)
+				go updateReadDROnPublish(c, topicSplit)
 			}
 
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
 			case common.TopicMessageTypeDeliveredDR:
-				go updateDeliveredDROnPublish(c, topic)
+				go updateDeliveredDROnPublish(c, topicSplit)
 			}
 		}
+		api.GenerateResponse(c, nil)
 	}
 }
 
@@ -55,15 +55,7 @@ type PublishDeliveredDR struct {
 	CommunityID  interface{} `json:"community_id"`
 }
 
-func updateDeliveredDROnPublish(c *gin.Context, topic string) {
-	// Extract chatroom_id from the topic by splitting.
-	topicSplit, err := GetTopicSplit(topic)
-	if err != nil || len(topicSplit) < 2 {
-		api.GeneralBadRequestError(c, common.ErrorTopicInvalid)
-		return
-	}
-	chatroomID := topicSplit[1]
-
+func updateDeliveredDROnPublish(c *gin.Context, topicSplit []string) {
 	deliveredUUID := c.GetHeader(constant.HeadersMemberID)
 	if deliveredUUID == "" || deliveredUUID == "null" {
 		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
@@ -80,6 +72,7 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 	}
 
 	// Construct the Redis key for the chatroom delivery report.
+	chatroomID := topicSplit[1]
 	redisKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 
 	// Get the Redis client from the context.
@@ -98,26 +91,10 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 		// Construct the key for the conversation delivery report.
 		conversationKey := fmt.Sprintf("%s", drConversation.Member)
 
-		// Fetch the conversation delivery report from Redis.
-		conversationData, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		// Unmarshal the fetched data into a map.
-		var conversationMap map[string]interface{}
-		if err := json.Unmarshal([]byte(conversationData), &conversationMap); err != nil {
-			log.Println(fmt.Sprintf(common.ErrorUnmarshalErrorJson, err))
-			continue
-		}
-
-		// Extract the sender UUID from the fetched conversation data.
-		senderUUID, _ := conversationMap["sender_uuid"].(string)
-
 		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, deliveredDR.CommunityID, chatroomID, conversationKey, deliveredUUID, deliveredDeviceID); err != nil {
 			log.Println(err)
+			continue
 		}
 	}
 }
@@ -128,13 +105,7 @@ type PublishReadDR struct {
 	CommunityID  interface{} `json:"community_id"`
 }
 
-func updateReadDROnPublish(c *gin.Context, topic string) {
-	// Extract chatroom_id from the topic by splitting.
-	topicSplit, err := GetTopicSplit(topic)
-	if err != nil || len(topicSplit) < 2 {
-		api.GeneralBadRequestError(c, common.ErrorTopicInvalid)
-		return
-	}
+func updateReadDROnPublish(c *gin.Context, topicSplit []string) {
 	chatroomID := topicSplit[1]
 
 	readUUID := c.GetHeader(constant.HeadersMemberID)

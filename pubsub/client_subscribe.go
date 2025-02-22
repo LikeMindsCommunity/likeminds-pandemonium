@@ -219,17 +219,18 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			}
 
 			// Create conversation data in database
-			createConversationPSResponse := handlers.CreateMessage(jsonMessageMap, client.UUID, client.ApiKey, client.DeviceID, client.Topic, client.SDKSource, client.PlatformCode, client.VersionCode, client.ApiVersion, participantsStringList, totalParticipantsCountInt)
-			log.Print(createConversationPSResponse)
+			createMessagePSResponse, createMessageResponse := handlers.CreateMessage(jsonMessageMap, client.UUID, client.ApiKey, client.DeviceID, client.Topic, client.SDKSource, client.PlatformCode, client.VersionCode, client.ApiVersion, participantsStringList, totalParticipantsCountInt)
 
 			// publish response to pubsub TopicNameChatroom
-			createConversationPSResponseBytes, err := json.Marshal(createConversationPSResponse)
+			createConversationPSResponseBytes, err := json.Marshal(createMessagePSResponse)
 			if err != nil {
 				log.Printf(common.ErrorInvalidJSONFormat, err)
 				return
 			}
 
-			go updateSentDR(redisClient, wsServerParent, client.DeviceID, createConversationPSResponseBytes)
+			// Send sent delivery report to sender connection
+			go updateSentDR(redisClient, wsServerParent, client.UUID, client.DeviceID, createMessageResponse.Data.Message.CardID, createMessageResponse.Data.Message.CommunityID,
+				createMessageResponse.Data.Message.ID, float64(createMessageResponse.Data.Message.CreatedAt), createMessageResponse.TotalParticipantsCount)
 			//todo to publish to community topic as well
 			if err := PublishMessageToRedis(redisClient, client.Topic, createConversationPSResponseBytes); err != nil {
 				return
@@ -353,13 +354,12 @@ func updateDeliveredDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.
 	if conversationResponse == nil {
 		return
 	}
-	// Extract chatroomID and senderUUID from the conversation.
-	senderUUID := *conversationResponse.Data.User.UserUniqueID
+
 	conversationID := conversationResponse.Data.Message.ID
 	chatroomID := conversationResponse.Data.Message.CardID
 	communityID := conversationResponse.Data.Message.CommunityID
 
-	if err := UpdateDeliveredDRWithConversationID(redisClient, wsServerParent, chatroomID, conversationID, deliveredDeviceID, senderUUID, deliveredUUID, communityID); err != nil {
+	if err := UpdateDeliveredDRWithConversationID(redisClient, wsServerParent, communityID, chatroomID, conversationID, deliveredUUID, deliveredDeviceID); err != nil {
 		log.Println(err)
 	}
 }
@@ -377,8 +377,8 @@ func updateReadDROnSubscribe(redisClient *redis.Client, wsServerParent *ws.WsSer
 	}
 }
 
-func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData []byte) {
-	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData); err != nil {
+func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, senderUUID, senderDeviceID string, chatroomID, communityID int, conversationID int64, conversationCreatedAt float64, participantsCount int) {
+	if err := UpdateSentDR(redisClient, wsServerParent, senderUUID, senderDeviceID, chatroomID, communityID, conversationID, conversationCreatedAt, participantsCount); err != nil {
 		log.Println(err)
 	}
 }

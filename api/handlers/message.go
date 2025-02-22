@@ -12,7 +12,7 @@ import (
 	"log"
 )
 
-func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int, participants []string, totalParticipantsCount int) requestresponse.PSResponse {
+func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int, participants []string, totalParticipantsCount int) (requestresponse.PSResponse, *requestresponse.CreateMessageResponse) {
 
 	psResponse := &requestresponse.PSResponse{
 		DeviceID:         deviceID,
@@ -26,23 +26,23 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 	CreateMessageData, err := json.Marshal(messageData["data"])
 	if err != nil {
 		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to marshal create message json data, err=%s", err))
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	var createMessageRequest requestresponse.CreateMessageRequest
 	if err := json.Unmarshal(CreateMessageData, &createMessageRequest); err != nil {
 		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to unmarshal create message request, err=%s", err))
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	requestContext, apiError := helpers.ValidateCreateMessageRequest(&createMessageRequest, UUID, apiKey, deviceID, topic)
 	if apiError != nil {
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	apiError = helpers.ValidateCreateMessagePermission(&createMessageRequest, requestContext.Chatroom, requestContext.UserInfo.UserID, requestContext.MemberState)
 	if apiError != nil {
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	collabcardState, err := helpers.GetUserCollabcardStateForChatroom(int(requestContext.Chatroom.ID), requestContext.UserInfo.UserID)
@@ -57,7 +57,7 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 			requestContext.Chatroom.Type == constant.ChatroomTypeDirectMessage &&
 			*collabcardState.ChatRequestState == constant.DMChatRequestStatesRejected {
 			apiError = constant.APIErrorForbidden(fmt.Errorf("failed to create message, user is blocked"))
-			return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+			return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 		}
 	}
 
@@ -76,32 +76,32 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 	createMessageModelInstance := &models.Message{}
 	apiError = helpers.FillCreateMessageModelInstance(createMessageModelInstance, &createMessageRequest, *requestContext, deviceID, isGuest, platformCode)
 	if apiError != nil {
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	createMessageAttachmentModelInstances := &[]models.MessageAttachment{}
 	apiError = helpers.FillCreateMessageAttachmentsModelInstances(createMessageAttachmentModelInstances, createMessageRequest.Attachments)
 	if apiError != nil {
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	createMessagePollModelInstances := &[]models.MessagePoll{}
 	apiError = helpers.FillCreateMessagePollModelInstances(createMessagePollModelInstances, createMessageRequest.Polls, requestContext.UserInfo.UserID)
 	if apiError != nil {
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
 	var swarmCreateWidgetRequest *requestresponse.SwarmCreateWidgetRequest
 	if requestContext.CreateWidget {
 		swarmCreateWidgetRequest, apiError = helpers.GetSwarmCreateWidgetRequest(UUID, apiKey, int(requestContext.Community.ID), constant.MessageWidgetTypeMessageEnum, createMessageRequest.Metadata)
 		if apiError != nil {
-			return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+			return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 		}
 	}
 
 	messageResponse, apiError := helpers.CreateMessageInDB(createMessageModelInstance, *createMessageAttachmentModelInstances, *createMessagePollModelInstances, swarmCreateWidgetRequest)
 	if apiError != nil {
-		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError)
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 	messageResponse.User = requestContext.UserInfo
 	messageResponse.RepliedMessage = requestContext.OriginalMessage
@@ -119,5 +119,5 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		)
 	})
 
-	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse, participants, totalParticipantsCount)
+	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse, participants, totalParticipantsCount), createMessageResponse
 }
