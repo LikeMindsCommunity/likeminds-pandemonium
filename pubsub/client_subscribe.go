@@ -229,8 +229,9 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			}
 
 			// Send sent delivery report to sender connection
-			go updateSentDR(redisClient, wsServerParent, client.UUID, client.DeviceID, createMessageResponse.Data.Message.CardID, createMessageResponse.Data.Message.CommunityID,
-				createMessageResponse.Data.Message.ID, float64(createMessageResponse.Data.Message.CreatedAt), createMessageResponse.TotalParticipantsCount)
+			go updateSentDR(redisClient, wsServerParent, client.UUID, client.DeviceID, createMessageResponse.Data.Message.CardID,
+				createMessageResponse.Data.Message.CommunityID, createMessageResponse.Data.Message.ID, float64(createMessageResponse.Data.Message.CreatedAt),
+				createMessageResponse.TotalParticipantsCount)
 			//todo to publish to community topic as well
 			if err := PublishMessageToRedis(redisClient, client.Topic, createConversationPSResponseBytes); err != nil {
 				return

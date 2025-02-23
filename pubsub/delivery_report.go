@@ -20,21 +20,22 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
 
-	// Update the cache for chatroom and conversation
+	// Update Zset key dr_chatroom_<chatroom_id> where score will be <conversation created at timestamp> and member will be dr_conversation_<conversation_id>
 	err := SaveZSet(redisClient, chatroomKey, conversationCreatedAt, conversationKey, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
 
+	// Create ConversationMetaCache object will participantsCount and senderUUID and save in HastSet key dr_conversation_<conversation_id> where field will be dr_conversation_meta and value will be ConversationMetaCache
 	var conversationMetaCache = models.ConversationMetaCache{DeliveryCount: participantsCount, SenderUUID: senderUUID}
 	err = SaveHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix, conversationMetaCache, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
 
+	// Fine client connection who sent the message to send him sent_dr topic message type payload. He can be connected either to chatroom:<chatroom_id> or community:<community_id> topic
 	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
 	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
-	// Send the updated delivered report to the conversation creator's connection.
 	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
 	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, senderUUID)
 	finalClient := clientConnectedToChatroom
@@ -42,7 +43,7 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		finalClient = clientConnectedToCommunity
 	}
 	if finalClient != nil {
-		// Marshal the updated delivered report for the response.
+		// Marshal the updated sent report for the response.
 		sentReportBytes, err := json.Marshal(conversationMetaCache)
 		if err != nil {
 			return err
@@ -59,26 +60,26 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 
 // UpdateDeliveredDRWithConversationID updates the delivered report in Redis and sends a payload to the conversation creator.
 func UpdateDeliveredDRWithConversationID(redisClient *redis.Client, wsServerParent *ws.WsServerParent, communityID, chatroomID, conversationID interface{}, deliveredUUID, deliveredDeviceID string) error {
-	// Fetch and update the dr_conversation_<conversation_id>
+	// Fetch and update the dr_conversation_<conversation_id> with delivered report
 	conversationKey := fmt.Sprintf(common.DRConversationPrefix, conversationID)
 	return UpdateDeliveredDR(redisClient, wsServerParent, communityID, chatroomID, conversationKey, deliveredUUID, deliveredDeviceID)
 }
 
 // UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
 func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, communityID, chatroomID interface{}, conversationKey, deliveredUUID, deliveredDeviceID string) error {
-	// Fetch the conversation meta field from Redis.
+	// Fetch the dr_conversation_meta field from Redis.
 	conversationMetaCacheValue, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
 	if err != nil {
 		return err
 	}
 
-	// Unmarshal the fetched data into a map.
+	// Unmarshal the fetched data into ConversationMetaCache
 	var conversationMetaCache models.ConversationMetaCache
 	if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
-	// Extract the sender UUID from the fetched conversation data.
+	// Extract the sender UUID from the fetched dr_conversation_meta
 	senderUUID := conversationMetaCache.SenderUUID
 	if senderUUID == "" {
 		return fmt.Errorf(common.ErrorSenderUUIDMissing, conversationKey)
@@ -100,12 +101,13 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 
 	// Set the current timestamp as the delivered timestamp.
 	currentTimestamp := time.Now().UnixMilli()
-	// Update the Redis key with the new delivered report.
+	// Update the Redis key dr_conversation_<conversation_id> where field will be dr_user_delivered_<uuid> and value will be <current time in millis>
 	err = SaveHashSet(redisClient, conversationKey, deliveredUUIDField, currentTimestamp, common.DeliveryReportTTL)
 	if err != nil {
 		return err
 	}
 
+	// Fine client connection who sent the message to send him delivered_dr topic message type payload. He can be connected either to chatroom:<chatroom_id> or community:<community_id> topic
 	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
 	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
 	// Send the updated delivered report to the conversation creator's connection.
@@ -118,7 +120,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 	if finalClient != nil {
 		var deliveredReportMap map[string]interface{}
 		deliveredReportMap[common.DRConversationMetaPrefix] = conversationMetaCache
-		// Include the new delivered report field in the response.
+		// Include the new delivered report uuid
 		deliveredReportMap[deliveredUUIDField] = currentTimestamp
 
 		// Marshal the updated delivered report for the response.
@@ -127,7 +129,6 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 			return err
 		}
 
-		// Create the response payload for the delivered report.
 		deliveredReportPSResponse := NewPSResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, string(deliveredReportMapBytes))
 
 		// Send the payload via WebSocket to the conversation creator.
@@ -224,6 +225,7 @@ func DeliveryReportHandler(c *gin.Context) {
 		deliveryReport[conversationID] = map[string]interface{}{
 			common.DRConversationMetaPrefix:    conversationMetaCache,
 			common.TopicMessageTypeDeliveredDR: extractDeliveredDRFields(data),
+			common.TopicMessageTypeReadDR:      extractReadDRFields(data),
 		}
 	}
 
@@ -247,6 +249,21 @@ func extractDeliveredDRFields(data map[string]string) map[string]interface{} {
 		}
 	}
 	return deliveredDR
+}
+
+// extractReadDRFields extracts the delivered reports from the Redis data map.
+func extractReadDRFields(data map[string]string) map[string]interface{} {
+	readDR := make(map[string]interface{})
+
+	// Iterate through all fields in the Redis hash and find delivered report fields.
+	for key, value := range data {
+		if strings.HasPrefix(key, common.DRUserRead) {
+			// Remove the prefix from the key before adding it to the map.
+			strippedKey := strings.TrimPrefix(key, common.DRUserRead)
+			readDR[strippedKey] = value
+		}
+	}
+	return readDR
 }
 
 // UpdateReadDRWithConversationID updates the delivered report in Redis and sends a payload to the conversation creator.
@@ -293,7 +310,7 @@ func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 
 	// Set the current timestamp as the read timestamp.
 	currentTimestamp := time.Now().UnixMilli()
-	// Update the Redis key with the new read report.
+	// Update the Redis key dr_conversation_<conversation_id> where field will be dr_user_read_<uuid> and value will be <current time in millis>
 	err = SaveHashSet(redisClient, conversationKey, readUUIDField, currentTimestamp, common.DeliveryReportTTL)
 	if err != nil {
 		return err
@@ -301,7 +318,7 @@ func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 
 	topicChatroom := fmt.Sprintf(common.TopicTypeChatroomDynamic, chatroomID)
 	topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
-	// Send the updated read report to the conversation creator's connection.
+	// Fine client connection who sent the message to send him read_dr topic message type payload. He can be connected either to chatroom:<chatroom_id> or community:<community_id> topic
 	clientConnectedToChatroom := wsServerParent.GetConnectionFromWsServer(topicChatroom, senderUUID)
 	clientConnectedToCommunity := wsServerParent.GetConnectionFromWsServer(topicCommunity, senderUUID)
 	finalClient := clientConnectedToChatroom
@@ -321,7 +338,6 @@ func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 			return err
 		}
 
-		// Create the response payload for the read report.
 		readReportPSResponse := NewPSResponse(readDeviceID, common.TopicMessageTypeReadDR, string(readReportBytes))
 
 		// Send the payload via WebSocket to the conversation creator.
