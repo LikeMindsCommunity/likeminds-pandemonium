@@ -12,10 +12,10 @@ import (
 	"log"
 )
 
-func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, deviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int, participants []string, totalParticipantsCount int) (requestresponse.PSResponse, *requestresponse.CreateMessageResponse) {
+func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, senderDeviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int, participants []string, totalParticipantsCount int) (requestresponse.PSResponse, *requestresponse.CreateMessageResponse) {
 
 	psResponse := &requestresponse.PSResponse{
-		DeviceID:         deviceID,
+		DeviceID:         senderDeviceID,
 		TopicMessageType: common.TopicMessageTypeCreateConversationResponse,
 		RawData:          "",
 	}
@@ -35,7 +35,7 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
 
-	requestContext, apiError := helpers.ValidateCreateMessageRequest(&createMessageRequest, UUID, apiKey, deviceID, topic)
+	requestContext, apiError := helpers.ValidateCreateMessageRequest(&createMessageRequest, UUID, apiKey, senderDeviceID, topic)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}
@@ -74,7 +74,7 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 	}
 
 	createMessageModelInstance := &models.Message{}
-	apiError = helpers.FillCreateMessageModelInstance(createMessageModelInstance, &createMessageRequest, *requestContext, deviceID, isGuest, platformCode)
+	apiError = helpers.FillCreateMessageModelInstance(createMessageModelInstance, &createMessageRequest, *requestContext, senderDeviceID, isGuest, platformCode)
 	if apiError != nil {
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
 	}

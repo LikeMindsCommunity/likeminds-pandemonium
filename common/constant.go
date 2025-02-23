@@ -79,7 +79,7 @@ const (
 	ErrorCommunityIDMissing      = "community ID is missing in request"
 	ErrorTopicMessageTypeMissing = "topic message type is missing from params"
 	ErrorTopicMissing            = "topic is missing from request"
-	ErrorTopicInvalid            = "invalid format of topic"
+	ErrorTopicInvalid            = "invalid format of topic: %v"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
 	ErrorSenderUUIDMissing       = "sender uuids is missing in cache key: %v"
 	ErrorConversationIDMissing   = "conversation ID is missing in request"
