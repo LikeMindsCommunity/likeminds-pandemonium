@@ -12,18 +12,24 @@ import (
 	"log"
 )
 
-func CreateMessage(messageData map[string]interface{}, UUID string, apiKey string, senderDeviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int, participants []string, totalParticipantsCount int) (requestresponse.PSResponse, *requestresponse.CreateMessageResponse) {
-
+func CreateMessage(psRequest requestresponse.PSRequest, UUID string, apiKey string, senderDeviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) (requestresponse.PSResponse, *requestresponse.CreateMessageResponse) {
 	psResponse := &requestresponse.PSResponse{
 		DeviceID:         senderDeviceID,
 		TopicMessageType: common.TopicMessageTypeCreateConversationResponse,
-		RawData:          "",
+		RawData:          make([]byte, 0),
 	}
 
 	createMessageResponse := &requestresponse.CreateMessageResponse{}
 	apiError := &constant.APIError{}
 
-	CreateMessageData, err := json.Marshal(messageData["data"])
+	var psRequestRawDataMap map[string]interface{}
+	err := json.Unmarshal(psRequest.RawData, &psRequestRawDataMap)
+	if err != nil {
+		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to marshal PSRequest.RawData, err=%s", err))
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
+	}
+
+	CreateMessageData, err := json.Marshal(psRequestRawDataMap["data"])
 	if err != nil {
 		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to marshal create message json data, err=%s", err))
 		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
@@ -119,5 +125,19 @@ func CreateMessage(messageData map[string]interface{}, UUID string, apiKey strin
 		)
 	})
 
-	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse, participants, totalParticipantsCount), createMessageResponse
+	participants := psRequestRawDataMap[common.ParamParticipantsType]
+	participantsStringList, ok := participants.([]string)
+	if !ok {
+		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to get %s from PSRequest.RawData, err=%s", common.ParamParticipantsType, err))
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
+	}
+
+	totalParticipantsCount := psRequestRawDataMap[common.ParamTotalParticipantsCountType]
+	totalParticipantsCountInt, ok := totalParticipantsCount.(int)
+	if !ok {
+		apiError = constant.APIErrorBadRequest(fmt.Errorf("failed to get %s from PSRequest.RawData, err=%s", common.ParamTotalParticipantsCountType, err))
+		return helpers.CreateMessageErrorResponse(psResponse, createMessageResponse, apiError), nil
+	}
+
+	return helpers.CreateMessageSuccessResponse(psResponse, createMessageResponse, messageResponse, participantsStringList, totalParticipantsCountInt), createMessageResponse
 }

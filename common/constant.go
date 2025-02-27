@@ -4,22 +4,18 @@ import "time"
 
 const (
 	RedisClient                                = "redis_client"
-	PostgresClient                             = "postgres_client"
 	ReadBufferSizeDefault                      = 4096
 	WriteBufferSizeDefault                     = 4096
 	ParamTopic                                 = "topic"
 	ParamTopicMessageType                      = "topic_message_type"
 	TopicTypeChatroom                          = "chatroom"
 	TopicTypeCommunity                         = "community"
-	TopicMessageTypeConversation               = "conversation"
 	TopicMessageTypeCreateConversationRequest  = "message.create.request"
 	TopicMessageTypeCreateConversationResponse = "message.create.response"
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer
-	PongWait = 60 * time.Second
-	// PingPeriod should be less than PongWait
-	PingPeriod                      = (PongWait * 9) / 10
+	PongWait                        = 60 * time.Second
 	WsServerKey                     = "ws_server"
 	TopicMessageTypeSentDR          = "sent_dr"
 	TopicMessageTypeDeliveredDR     = "delivered_dr"
@@ -28,10 +24,7 @@ const (
 	DRConversationMetaPrefix        = "dr_conversation_meta"
 	DRUserDeliveredPrefix           = DRUserDelivered + "%v"
 	TopicTypeChatroomDynamic        = "chatroom:%v"
-	RawData                         = "raw_data"
 	DRUserDelivered                 = "dr_user_delivered_"
-	DeliveryCount                   = "delivery_count"
-	SenderUUID                      = "sender_uuid"
 	ParamChatroomID                 = "chatroom_id"
 	ParamConversationIDs            = "conversation_ids"
 	TopicTypeCommunityDynamic       = "community:%v"
@@ -52,25 +45,24 @@ const (
 )
 
 const (
-	ErrorFailedUpgrader                 = "failed to upgrade connection: %v"
-	ErrorPublishRedis                   = "failed to publish message to topic %s: %v"
-	ErrorSubscribeRedis                 = "failed to subscribe to topic %s: %v"
-	ErrorReadClientWs                   = "error reading message from client: %v"
-	ErrorReadDeadlineWs                 = "error while setting ReadDeadline on websocket:"
-	ErrorWriteDeadlineWs                = "error while setting WriteDeadline on websocket:"
-	ErrorUnableToCloseWs                = "unable to close ws error:"
-	ErrorUnableToCloseRedis             = "unable to close redis error:"
-	ErrorUnmarshalErrorJson             = "unmarshal error: %v"
-	ErrorUnableToWriteWs                = "unable to write message in websocket: %v"
-	ErrorWriterOpenWs                   = "unable to open websocket writer: %v"
-	ErrorWriterCloseWs                  = "unable to close websocket writer: %v"
-	ErrorPongSentClient                 = "error sending pong to client: %v"
-	ErrorFailedCacheSaveRedis           = "failed to save cache: %v"
-	ErrorFailedExpSaveRedis             = "failed to save cache exp: %v"
-	ErrorFailedCacheFetchRedis          = "failed to fetch from redis cache: %v"
-	ErrorMarshalErrorJson               = "marshal error: %v"
-	ErrorInvalidJSONFormat              = "invalid JSON format: %v"
-	ErrorInvalidTotalParticipantsFormat = "invalid total participants format"
+	ErrorFailedUpgrader        = "failed to upgrade connection: %v"
+	ErrorPublishRedis          = "failed to publish message to topic %s: %v"
+	ErrorSubscribeRedis        = "failed to subscribe to topic %s: %v"
+	ErrorReadClientWs          = "error reading message from client: %v"
+	ErrorReadDeadlineWs        = "error while setting ReadDeadline on websocket:"
+	ErrorWriteDeadlineWs       = "error while setting WriteDeadline on websocket:"
+	ErrorUnableToCloseWs       = "unable to close ws error: %v"
+	ErrorUnableToCloseRedis    = "unable to close redis error: %v"
+	ErrorUnmarshalErrorJson    = "unmarshal error: %v"
+	ErrorUnableToWriteWs       = "unable to write message in websocket: %v"
+	ErrorWriterOpenWs          = "unable to open websocket writer: %v"
+	ErrorWriterCloseWs         = "unable to close websocket writer: %v"
+	ErrorPongSentClient        = "error sending pong to client: %v"
+	ErrorFailedCacheSaveRedis  = "failed to save cache: %v"
+	ErrorFailedExpSaveRedis    = "failed to save cache exp: %v"
+	ErrorFailedCacheFetchRedis = "failed to fetch from redis cache: %v"
+	ErrorMarshalErrorJson      = "marshal error: %v"
+	ErrorInvalidJSONFormat     = "invalid JSON format: %v"
 )
 
 const (

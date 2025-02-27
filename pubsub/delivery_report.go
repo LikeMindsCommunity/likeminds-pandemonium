@@ -48,7 +48,7 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		if err != nil {
 			return err
 		}
-		sentDRPSResponse := NewPSResponse(senderDeviceID, common.TopicMessageTypeSentDR, string(sentDRBytes))
+		sentDRPSResponse := NewPSResponse(senderDeviceID, common.TopicMessageTypeSentDR, sentDRBytes)
 
 		if err := finalClient.SendPayloadToClientConnection(sentDRPSResponse); err != nil {
 			return err
@@ -61,14 +61,14 @@ func UpdateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 // UpdateDeliveredDR updates the delivered report in Redis and sends a payload to the conversation creator.
 func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deliveredUUID, deliveredDeviceID string, communityID, chatroomID interface{}, conversationKey string) error {
 	// Fetch the dr_conversation_meta field from Redis.
-	conversationMetaCacheValue, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
+	conversationMetaCacheField, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
 	if err != nil {
 		return err
 	}
 
 	// Unmarshal the fetched data into ConversationMetaCache
 	var conversationMetaCache models.ConversationMetaCache
-	if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
+	if err := json.Unmarshal([]byte(conversationMetaCacheField), &conversationMetaCache); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
@@ -121,7 +121,7 @@ func UpdateDeliveredDR(redisClient *redis.Client, wsServerParent *ws.WsServerPar
 		if err != nil {
 			return err
 		}
-		deliveredDRPSResponse := NewPSResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, string(deliveredDRMapBytes))
+		deliveredDRPSResponse := NewPSResponse(deliveredDeviceID, common.TopicMessageTypeDeliveredDR, deliveredDRMapBytes)
 
 		// Send the payload via WebSocket to the conversation creator.
 		if err := finalClient.SendPayloadToClientConnection(deliveredDRPSResponse); err != nil {
@@ -199,22 +199,22 @@ func DeliveryReportHandler(c *gin.Context) {
 		}
 
 		// Extract the "dr_conversation_meta" field.
-		conversationMetaCacheValue, ok := conversationKeyValue[common.DRConversationMetaPrefix]
-		if !ok || conversationMetaCacheValue == "" {
+		conversationMetaField, ok := conversationKeyValue[common.DRConversationMetaPrefix]
+		if !ok || conversationMetaField == "" {
 			log.Printf("Missing or empty dr_conversation_meta for conversation %s", conversationID)
 			continue
 		}
 
 		/*// Unmarshal the metadata field. todo might not required this
 		var conversationMetaCache models.ConversationMetaCache
-		if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
+		if err := json.Unmarshal([]byte(conversationMetaField), &conversationMetaCache); err != nil {
 			log.Printf("Error unmarshalling conversation meta for %s: %v", conversationID, err)
 			continue
 		}*/
 
 		// Add the conversation conversationKeyValue to the delivery report map directly.
 		deliveryReportMap[conversationID] = map[string]interface{}{
-			common.DRConversationMetaPrefix:    conversationMetaCacheValue,
+			common.DRConversationMetaPrefix:    conversationMetaField,
 			common.TopicMessageTypeDeliveredDR: extractDeliveredDRFieldValue(conversationKeyValue),
 			common.TopicMessageTypeReadDR:      extractReadDRFieldValue(conversationKeyValue),
 		}
@@ -260,14 +260,14 @@ func extractReadDRFieldValue(conversationKeyValue map[string]string) map[string]
 // UpdateReadDR updates the read report in Redis and sends a payload to the conversation creator.
 func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, readUUID, readDeviceID string, communityID, chatroomID interface{}, conversationKey string) error {
 	// Fetch the conversation delivery report from Redis.
-	conversationMetaCacheValue, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
+	conversationMetaCacheField, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
 	if err != nil {
 		return err
 	}
 
 	// Unmarshal the fetched data into a map.
 	var conversationMetaCache models.ConversationMetaCache
-	if err := json.Unmarshal([]byte(conversationMetaCacheValue), &conversationMetaCache); err != nil {
+	if err := json.Unmarshal([]byte(conversationMetaCacheField), &conversationMetaCache); err != nil {
 		return fmt.Errorf(common.ErrorUnmarshalErrorJson, err)
 	}
 
@@ -321,7 +321,7 @@ func UpdateReadDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, 
 		if err != nil {
 			return err
 		}
-		readDRPSResponse := NewPSResponse(readDeviceID, common.TopicMessageTypeReadDR, string(readDRMapBytes))
+		readDRPSResponse := NewPSResponse(readDeviceID, common.TopicMessageTypeReadDR, readDRMapBytes)
 
 		// Send the payload via WebSocket to the conversation creator.
 		if err := finalClient.SendPayloadToClientConnection(readDRPSResponse); err != nil {

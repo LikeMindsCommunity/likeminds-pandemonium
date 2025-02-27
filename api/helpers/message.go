@@ -503,7 +503,7 @@ func CreateMessageErrorResponse(psResponse *requestresponse.PSResponse, createMe
 	if err != nil {
 		log.Printf("failed to marshal create message response, err=%s", err)
 	}
-	psResponse.RawData = string(createMessageResponseBytes)
+	psResponse.RawData = createMessageResponseBytes
 
 	return *psResponse
 }
@@ -522,7 +522,7 @@ func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, create
 	if err != nil {
 		log.Printf("failed to marshal create message response, err=%s", err)
 	}
-	psResponse.RawData = string(createMessageResponseBytes)
+	psResponse.RawData = createMessageResponseBytes
 
 	return *psResponse
 }

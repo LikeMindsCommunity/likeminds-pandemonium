@@ -186,17 +186,17 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 
 	// Start endless read loop, waiting for messages from client
 	for {
-		readMessageType, readMessagePayload, err := client.Conn.ReadMessage()
+		readMessageFromClientType, readMessageFromClientBytes, err := client.Conn.ReadMessage()
 		if err != nil {
 			log.Printf(common.ErrorReadClientWs, err)
 			return
 		}
-		log.Printf(common.ReceivedMessageClientWs, readMessageType)
+		log.Printf(common.ReceivedMessageClientWs, readMessageFromClientType)
 
-		var readMessageJsonMap map[string]interface{}
-		err = json.Unmarshal(readMessagePayload, &readMessageJsonMap)
+		var psRequest requestresponse.PSRequest
+		err = json.Unmarshal(readMessageFromClientBytes, &psRequest)
 		if err != nil {
-			log.Printf(common.ErrorInvalidJSONFormat, err)
+			log.Printf(common.ErrorUnmarshalErrorJson, err)
 			return
 		}
 
@@ -207,7 +207,7 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			return
 		}
 
-		topicMessageType := readMessageJsonMap[common.ParamTopicMessageType]
+		topicMessageType := psRequest.TopicMessageType
 
 		switch topicSplit[0] {
 		case common.TopicTypeChatroom:
@@ -215,36 +215,28 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 			case common.TopicMessageTypeCreateConversationRequest:
 				log.Println(topicMessageType)
 
-				participants := readMessageJsonMap[common.ParamParticipantsType]
-				participantsStringList, ok := participants.([]string)
-				if !ok {
-					log.Print(common.ErrorInvalidTotalParticipantsFormat)
-					return
-				}
-
-				totalParticipantsCount := readMessageJsonMap[common.ParamTotalParticipantsCountType]
-				totalParticipantsCountInt, ok := totalParticipantsCount.(int)
-				if !ok {
-					log.Print(common.ErrorInvalidTotalParticipantsFormat)
-					return
-				}
-
 				// Create conversation data in database and return PSResponse with topic_message_type as message.create.response
-				createMessagePSResponse, createMessageResponse := handlers.CreateMessage(readMessageJsonMap, client.UUID, client.ApiKey, client.DeviceID, client.Topic, client.SDKSource, client.PlatformCode, client.VersionCode, client.ApiVersion, participantsStringList, totalParticipantsCountInt)
+				createMessagePSResponse, createMessageResponse := handlers.CreateMessage(psRequest, client.UUID, client.ApiKey, client.DeviceID, client.Topic, client.SDKSource, client.PlatformCode, client.VersionCode, client.ApiVersion)
 
 				// publish response to pubsub TopicNameChatroom
 				createMessagePSResponseBytes, err := json.Marshal(createMessagePSResponse)
 				if err != nil {
-					log.Printf(common.ErrorInvalidJSONFormat, err)
+					log.Printf(common.ErrorMarshalErrorJson, err)
 					return
 				}
 
 				// Send sent delivery report to sender connection
-				go updateSentDROnSubscribe(redisClient, wsServerParent, client.UUID, client.DeviceID, createMessageResponse.Data.Message.CardID,
-					createMessageResponse.Data.Message.CommunityID, createMessageResponse.Data.Message.ID, float64(createMessageResponse.Data.Message.CreatedAt),
-					createMessageResponse.TotalParticipantsCount)
-				//todo to publish to community topicPrefix as well
+				chatroomID := createMessageResponse.Data.Message.CardID
+				communityID := createMessageResponse.Data.Message.CommunityID
+				conversationID := createMessageResponse.Data.Message.ID
+				createdAt := float64(createMessageResponse.Data.Message.CreatedAt)
+				go updateSentDROnSubscribe(redisClient, wsServerParent, client.UUID, client.DeviceID, chatroomID, communityID, conversationID, createdAt, createMessageResponse.TotalParticipantsCount)
+
 				if err := PublishMessageToRedis(redisClient, client.Topic, createMessagePSResponseBytes); err != nil {
+					return
+				}
+				topicCommunity := fmt.Sprintf(common.TopicTypeCommunityDynamic, communityID)
+				if err := PublishMessageToRedis(redisClient, topicCommunity, createMessagePSResponseBytes); err != nil {
 					return
 				}
 			}
@@ -264,7 +256,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 		// stop listening to pubsub TopicNameChatroom
 		err := sub.Close()
 		if err != nil {
-			log.Println(common.ErrorUnableToCloseRedis, err)
+			log.Printf(common.ErrorUnableToCloseRedis, err)
 			return
 		}
 	}()
@@ -292,7 +284,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 			switch channelMessagePSResponse.TopicMessageType {
 			case common.TopicMessageTypeCreateConversationResponse:
 				var createMessageResponse requestresponse.CreateMessageResponse
-				if err := json.Unmarshal([]byte(channelMessagePSResponse.RawData), &createMessageResponse); err != nil {
+				if err := json.Unmarshal(channelMessagePSResponse.RawData, &createMessageResponse); err != nil {
 					log.Printf(common.ErrorUnmarshalErrorJson, err)
 					return
 				}

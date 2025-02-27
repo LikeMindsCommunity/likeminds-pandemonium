@@ -10,7 +10,7 @@ import (
 )
 
 // NewPSResponse to create PSResponse from deviceID (device ID of user), topicMessageType (message type publish to connection), rawData (raw data publish to the connection)
-func NewPSResponse(deviceID string, topicMessageType string, rawData string) *requestresponse.PSResponse {
+func NewPSResponse(deviceID string, topicMessageType string, rawData []byte) *requestresponse.PSResponse {
 	return &requestresponse.PSResponse{DeviceID: deviceID, TopicMessageType: topicMessageType, RawData: rawData}
 }
 
