@@ -8,6 +8,7 @@ import (
 	"likeminds-pandemonium/api/repository"
 	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/api/utilities"
+	models2 "likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/external"
 	"log"
 	"net/http"
@@ -496,7 +497,7 @@ func CreateMessageInDB(
 	return messageResponse, nil
 }
 
-func CreateMessageErrorResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) requestresponse.PSResponse {
+func CreateMessageErrorResponse(psResponse *models2.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) models2.PSResponse {
 	fillCreateMessageErrorResponse(createMessageResponse, apiError)
 
 	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
@@ -515,7 +516,7 @@ func fillCreateMessageErrorResponse(createMessageResponse *requestresponse.Creat
 	createMessageResponse.Error = apiError.Error()
 }
 
-func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse, participants []string, totalParticipantsCount int) requestresponse.PSResponse {
+func CreateMessageSuccessResponse(psResponse *models2.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse, participants []string, totalParticipantsCount int) models2.PSResponse {
 	fillCreateMessageSuccessResponse(createMessageResponse, messageResponse, participants, totalParticipantsCount)
 
 	createMessageResponseBytes, err := json.Marshal(createMessageResponse)

@@ -9,11 +9,12 @@ import (
 	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/api/utilities"
 	"likeminds-pandemonium/common"
+	models2 "likeminds-pandemonium/common/models"
 	"log"
 )
 
-func CreateMessage(psRequest requestresponse.PSRequest, UUID string, apiKey string, senderDeviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) (requestresponse.PSResponse, *requestresponse.CreateMessageResponse) {
-	psResponse := &requestresponse.PSResponse{
+func CreateMessage(psRequest models2.PSRequest, UUID string, apiKey string, senderDeviceID string, topic string, sdkSource string, platformCode string, versionCode int, apiVersion int) (models2.PSResponse, *requestresponse.CreateMessageResponse) {
+	psResponse := &models2.PSResponse{
 		DeviceID:         senderDeviceID,
 		TopicMessageType: common.TopicMessageTypeCreateConversationResponse,
 		RawData:          make([]byte, 0),

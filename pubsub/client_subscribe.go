@@ -8,6 +8,7 @@ import (
 	"likeminds-pandemonium/api/handlers"
 	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/ws"
 	"log"
 	"net/http"
@@ -193,7 +194,7 @@ func readPump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient 
 		}
 		log.Printf(common.ReceivedMessageClientWs, readMessageFromClientType)
 
-		var psRequest requestresponse.PSRequest
+		var psRequest models.PSRequest
 		err = json.Unmarshal(readMessageFromClientBytes, &psRequest)
 		if err != nil {
 			log.Printf(common.ErrorUnmarshalErrorJson, err)
@@ -275,7 +276,7 @@ func writePump(wsServerParent *ws.WsServerParent, client *ws.Client, redisClient
 			}
 			// Unmarshal channelMessageByte PSResponse
 			channelMessageByte := []byte(channelMessage.Payload)
-			var channelMessagePSResponse requestresponse.PSResponse
+			var channelMessagePSResponse models.PSResponse
 			if err := json.Unmarshal(channelMessageByte, &channelMessagePSResponse); err != nil {
 				log.Printf(common.ErrorUnmarshalErrorJson, err)
 				return
@@ -341,7 +342,7 @@ func sendPongMessage(conn *websocket.Conn) {
 
 func updateReadDeadline(conn *websocket.Conn) {
 	//client.conn.SetReadLimit(maxMessageSize)
-	// SetReadDeadline to time.Now() + PongWait (which is < PingPeriod)
+	// SetReadDeadline to time.Now() + PongWait
 	err := conn.SetReadDeadline(time.Now().Add(common.PongWait))
 	if err != nil {
 		log.Println(common.ErrorReadDeadlineWs, err)

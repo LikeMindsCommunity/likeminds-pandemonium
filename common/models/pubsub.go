@@ -1,4 +1,4 @@
-package requestresponse
+package models
 
 type PSRequest struct {
 	TopicMessageType string `json:"topic_message_type"`
