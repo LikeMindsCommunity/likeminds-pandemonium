@@ -8,6 +8,7 @@ import (
 	"likeminds-pandemonium/api/repository"
 	requestresponse "likeminds-pandemonium/api/request_response"
 	"likeminds-pandemonium/api/utilities"
+	models2 "likeminds-pandemonium/common/models"
 	"likeminds-pandemonium/external"
 	"log"
 	"net/http"
@@ -496,14 +497,14 @@ func CreateMessageInDB(
 	return messageResponse, nil
 }
 
-func CreateMessageErrorResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) requestresponse.PSResponse {
+func CreateMessageErrorResponse(psResponse *models2.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, apiError *constant.APIError) models2.PSResponse {
 	fillCreateMessageErrorResponse(createMessageResponse, apiError)
 
 	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
 	if err != nil {
 		log.Printf("failed to marshal create message response, err=%s", err)
 	}
-	psResponse.RawData = string(createMessageResponseBytes)
+	psResponse.RawData = createMessageResponseBytes
 
 	return *psResponse
 }
@@ -515,14 +516,14 @@ func fillCreateMessageErrorResponse(createMessageResponse *requestresponse.Creat
 	createMessageResponse.Error = apiError.Error()
 }
 
-func CreateMessageSuccessResponse(psResponse *requestresponse.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) requestresponse.PSResponse {
-	fillCreateMessageSuccessResponse(createMessageResponse, messageResponse)
+func CreateMessageSuccessResponse(psResponse *models2.PSResponse, createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse, participants []string, totalParticipantsCount int) models2.PSResponse {
+	fillCreateMessageSuccessResponse(createMessageResponse, messageResponse, participants, totalParticipantsCount)
 
 	createMessageResponseBytes, err := json.Marshal(createMessageResponse)
 	if err != nil {
 		log.Printf("failed to marshal create message response, err=%s", err)
 	}
-	psResponse.RawData = string(createMessageResponseBytes)
+	psResponse.RawData = createMessageResponseBytes
 
 	return *psResponse
 }
@@ -550,11 +551,13 @@ func CreateMessageCaravanTasks(
 	external.NewAPIClientCaravan().Post(enpoint, requestPostBody)
 }
 
-func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse) {
+func fillCreateMessageSuccessResponse(createMessageResponse *requestresponse.CreateMessageResponse, messageResponse *requestresponse.MessageResponse, participants []string, totalParticipantsCount int) {
 	createMessageResponse.HTTPStatusCode = http.StatusOK
 	createMessageResponse.Success = true
 	createMessageResponse.Data = messageResponse
 	createMessageResponse.Error = ""
+	createMessageResponse.Participants = participants
+	createMessageResponse.TotalParticipantsCount = totalParticipantsCount
 }
 
 func validateWsChatroomID(chatroomID int, topic string) error {

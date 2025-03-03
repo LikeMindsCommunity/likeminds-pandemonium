@@ -5,18 +5,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"likeminds-pandemonium/common"
+	"likeminds-pandemonium/common/models"
 	"strings"
 )
 
-type PSResponse struct {
-	DeviceID         string `json:"device_id"`
-	TopicMessageType string `json:"topic_message_type"`
-	RawData          string `json:"raw_data"`
-}
-
-// NewResponse to create PSResponse from deviceID (device ID of user), topicMessageType (message type publish to connection), rawData (raw data publish to the connection)
-func NewResponse(deviceID string, topicMessageType string, rawData string) *PSResponse {
-	return &PSResponse{DeviceID: deviceID, TopicMessageType: topicMessageType, RawData: rawData}
+// NewPSResponse to create PSResponse from deviceID (device ID of user), topicMessageType (message type publish to connection), rawData (raw data publish to the connection)
+func NewPSResponse(deviceID string, topicMessageType string, rawData []byte) *models.PSResponse {
+	return &models.PSResponse{DeviceID: deviceID, TopicMessageType: topicMessageType, RawData: rawData}
 }
 
 // GetRedisClientFromContext Exposed api method to get pubsub client from context

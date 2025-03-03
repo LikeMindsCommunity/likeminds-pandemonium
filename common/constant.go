@@ -4,37 +4,35 @@ import "time"
 
 const (
 	RedisClient                                = "redis_client"
-	PostgresClient                             = "postgres_client"
 	ReadBufferSizeDefault                      = 4096
 	WriteBufferSizeDefault                     = 4096
 	ParamTopic                                 = "topic"
 	ParamTopicMessageType                      = "topic_message_type"
 	TopicTypeChatroom                          = "chatroom"
 	TopicTypeCommunity                         = "community"
-	TopicMessageTypeConversation               = "conversation"
 	TopicMessageTypeCreateConversationRequest  = "message.create.request"
 	TopicMessageTypeCreateConversationResponse = "message.create.response"
 	// WriteWait Max wait time when writing message to peer
 	WriteWait = 10 * time.Second
 	// PongWait Max time till next pong from peer
-	PongWait = 60 * time.Second
-	// PingPeriod should be less than PongWait
-	PingPeriod                  = (PongWait * 9) / 10
-	WsServerKey                 = "ws_server"
-	TopicMessageTypeSentDR      = "sent_dr"
-	TopicMessageTypeDeliveredDR = "delivered_dr"
-	DRChatroomPrefix            = "dr_chatroom_%v"
-	DRConversationPrefix        = "dr_conversation_%v"
-	DRConversationMetaPrefix    = "dr_conversation_meta"
-	DRUserPrefix                = DRUser + "%v"
-	TopicTypeChatroomDynamic    = "chatroom:%v"
-	RawData                     = "raw_data"
-	DRUser                      = "dr_user_"
-	DeliveryCount               = "delivery_count"
-	SenderUUID                  = "sender_uuid"
-	ParamChatroomID             = "chatroom_id"
-	ParamConversationIDs        = "conversation_ids"
-	TopicTypeCommunityDynamic   = "community:%v"
+	PongWait                        = 60 * time.Second
+	WsServerKey                     = "ws_server"
+	TopicMessageTypeSentDR          = "sent_dr"
+	TopicMessageTypeDeliveredDR     = "delivered_dr"
+	DRChatroomPrefix                = "dr_chatroom_%v"
+	DRConversationPrefix            = "dr_conversation_%v"
+	DRConversationMetaPrefix        = "dr_conversation_meta"
+	DRUserDeliveredPrefix           = DRUserDelivered + "%v"
+	TopicTypeChatroomDynamic        = "chatroom:%v"
+	DRUserDelivered                 = "dr_user_delivered_"
+	ParamChatroomID                 = "chatroom_id"
+	ParamConversationIDs            = "conversation_ids"
+	TopicTypeCommunityDynamic       = "community:%v"
+	DRUserRead                      = "dr_user_read_"
+	DRUserReadPrefix                = DRUserRead + "%v"
+	TopicMessageTypeReadDR          = "read_dr"
+	ParamTotalParticipantsCountType = "total_participants_count"
+	ParamParticipantsType           = "participants"
 )
 
 const (
@@ -53,8 +51,8 @@ const (
 	ErrorReadClientWs          = "error reading message from client: %v"
 	ErrorReadDeadlineWs        = "error while setting ReadDeadline on websocket:"
 	ErrorWriteDeadlineWs       = "error while setting WriteDeadline on websocket:"
-	ErrorUnableToCloseWs       = "unable to close ws error:"
-	ErrorUnableToCloseRedis    = "unable to close redis error:"
+	ErrorUnableToCloseWs       = "unable to close ws error: %v"
+	ErrorUnableToCloseRedis    = "unable to close redis error: %v"
 	ErrorUnmarshalErrorJson    = "unmarshal error: %v"
 	ErrorUnableToWriteWs       = "unable to write message in websocket: %v"
 	ErrorWriterOpenWs          = "unable to open websocket writer: %v"
@@ -73,8 +71,9 @@ const (
 	ErrorCommunityIDMissing      = "community ID is missing in request"
 	ErrorTopicMessageTypeMissing = "topic message type is missing from params"
 	ErrorTopicMissing            = "topic is missing from request"
-	ErrorTopicInvalid            = "invalid format of topic"
+	ErrorTopicInvalid            = "invalid format of topic: %v"
 	ErrorConversationIDsMissing  = "conversation IDs is missing in request"
+	ErrorSenderUUIDMissing       = "sender uuids is missing in cache key: %v"
 	ErrorConversationIDMissing   = "conversation ID is missing in request"
 )
 

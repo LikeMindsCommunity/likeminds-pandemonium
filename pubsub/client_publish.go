@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"encoding/json"
 	"fmt"
 	"likeminds-pandemonium/api"
 	"likeminds-pandemonium/api/constant"
@@ -10,7 +9,6 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 func Publish(c *gin.Context) {
@@ -21,82 +19,44 @@ func PublishWithMethod(c *gin.Context, method int) {
 	switch method {
 	case constant.POSTMethod:
 		topic := c.Param(common.ParamTopic)
-		topicMessageType := c.Query(common.ParamTopicMessageType)
-		if topicMessageType == "" || topicMessageType == "null" {
-			api.GeneralBadRequestError(c, common.ErrorTopicMessageTypeMissing)
-			return
-		}
 		topicSplit, err := GetTopicSplit(topic)
 		if err != nil {
 			api.GeneralBadRequestError(c, err.Error())
 			return
 		}
 
+		topicMessageType := c.Query(common.ParamTopicMessageType)
+		if topicMessageType == "" || topicMessageType == "null" {
+			api.GeneralBadRequestError(c, common.ErrorTopicMessageTypeMissing)
+			return
+		}
+
 		switch topicSplit[0] {
 		case common.TopicTypeChatroom:
 			switch topicMessageType {
-			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType, true)
-
 			case common.TopicMessageTypeDeliveredDR:
-				updateDeliveredDROnPublish(c, topic)
+				go updateDeliveredDROnPublish(c, topicSplit)
+			case common.TopicMessageTypeReadDR:
+				go updateReadDROnPublish(c, topicSplit)
 			}
+
 		case common.TopicTypeCommunity:
 			switch topicMessageType {
-			case common.TopicMessageTypeConversation:
-				publishRawDataOnTopic(c, topic, topicMessageType, false)
+			case common.TopicMessageTypeDeliveredDR:
+				go updateDeliveredDROnPublish(c, topicSplit)
 			}
 		}
+		api.GenerateResponse(c, nil)
 	}
 }
 
-func publishRawDataOnTopic(c *gin.Context, topic string, topicMessageType string, toUpdateSentDR bool) {
-	deviceID := c.GetHeader(constant.HeadersDeviceID)
-	rawData, _ := c.GetRawData()
-
-	psResponse := NewResponse(deviceID, topicMessageType, string(rawData))
-	responseBytes, err := json.Marshal(psResponse)
-	if err != nil {
-		return
-	}
-
-	redisClient := GetRedisClientFromContext(c)
-
-	//update sent delivery report when message is received in chatroom topic
-	wsServerParent := ws.GetWsServerParentFromContext(c)
-	if toUpdateSentDR {
-		go updateSentDR(redisClient, wsServerParent, deviceID, rawData)
-	}
-
-	// publish rawData to pubsub channel:<chatroomID>
-	if err := PublishMessageToRedis(redisClient, topic, responseBytes); err != nil {
-		api.GeneralAPIError(c, err.Error())
-		return
-	}
-	api.GenerateResponse(c, nil)
-}
-
-func updateSentDR(redisClient *redis.Client, wsServerParent *ws.WsServerParent, deviceID string, rawData interface{}) {
-	if err := UpdateSentDR(redisClient, wsServerParent, deviceID, rawData.([]byte)); err != nil {
-		log.Println(err)
-	}
-}
-
-type PublishDeliveredDR struct {
+type PublishDeliveredDRRequest struct {
 	MinTimestamp string      `json:"min_timestamp"`
 	MaxTimestamp string      `json:"max_timestamp"`
 	CommunityID  interface{} `json:"community_id"`
 }
 
-func updateDeliveredDROnPublish(c *gin.Context, topic string) {
-	// Extract chatroom_id from the topic by splitting.
-	topicSplit, err := GetTopicSplit(topic)
-	if err != nil || len(topicSplit) < 2 {
-		api.GeneralBadRequestError(c, common.ErrorTopicInvalid)
-		return
-	}
-	chatroomID := topicSplit[1]
-
+func updateDeliveredDROnPublish(c *gin.Context, topicSplit []string) {
 	deliveredUUID := c.GetHeader(constant.HeadersMemberID)
 	if deliveredUUID == "" || deliveredUUID == "null" {
 		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
@@ -106,50 +66,85 @@ func updateDeliveredDROnPublish(c *gin.Context, topic string) {
 	deliveredDeviceID := c.GetHeader(constant.HeadersDeviceID)
 
 	// Get the min_timestamp and max_timestamp from the body.
-	var deliveredDR PublishDeliveredDR
-	if err := c.ShouldBindJSON(&deliveredDR); err != nil {
+	var publishDeliveredDRRequest PublishDeliveredDRRequest
+	if err := c.ShouldBindJSON(&publishDeliveredDRRequest); err != nil {
 		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
 		return
 	}
 
 	// Construct the Redis key for the chatroom delivery report.
-	redisKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
+	chatroomID := topicSplit[1]
+	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
 
 	// Get the Redis client from the context.
 	redisClient := GetRedisClientFromContext(c)
 	wsServerParent := ws.GetWsServerParentFromContext(c)
 
-	// Step 1: Fetch all member values between min and max timestamps from the Redis key.
-	drConversations, err := FetchMembersFromZSet(redisClient, redisKey, deliveredDR.MinTimestamp, deliveredDR.MaxTimestamp)
+	// Step 1: Fetch all member values having score between min and max timestamps from the Redis key dr_chatroom_<chatroom_id>
+	chatroomKeyMembers, err := FetchMembersFromZSet(redisClient, chatroomKey, publishDeliveredDRRequest.MinTimestamp, publishDeliveredDRRequest.MaxTimestamp)
 	if err != nil {
 		api.GeneralAPIError(c, err.Error())
 		return
 	}
 
 	// Step 2: Iterate over each member value, which corresponds to conversation IDs.
-	for _, drConversation := range drConversations {
+	for _, chatroomKeyMember := range chatroomKeyMembers {
 		// Construct the key for the conversation delivery report.
-		conversationKey := fmt.Sprintf("%s", drConversation.Member)
+		conversationKey := fmt.Sprintf("%s", chatroomKeyMember.Member)
 
-		// Fetch the conversation delivery report from Redis.
-		conversationData, err := FetchFieldFromHashSet(redisClient, conversationKey, common.DRConversationMetaPrefix)
-		if err != nil {
+		// Update the delivered report using the common function.
+		if err := UpdateDeliveredDR(redisClient, wsServerParent, deliveredUUID, deliveredDeviceID, publishDeliveredDRRequest.CommunityID, chatroomID, conversationKey); err != nil {
 			log.Println(err)
 			continue
 		}
+	}
+}
 
-		// Unmarshal the fetched data into a map.
-		var conversationMap map[string]interface{}
-		if err := json.Unmarshal([]byte(conversationData), &conversationMap); err != nil {
-			log.Println(fmt.Sprintf(common.ErrorUnmarshalErrorJson, err))
-			continue
-		}
+type PublishReadDRRequest struct {
+	MinTimestamp string      `json:"min_timestamp"`
+	MaxTimestamp string      `json:"max_timestamp"`
+	CommunityID  interface{} `json:"community_id"`
+}
 
-		// Extract the sender UUID from the fetched conversation data.
-		senderUUID, _ := conversationMap["sender_uuid"].(string)
+func updateReadDROnPublish(c *gin.Context, topicSplit []string) {
+	chatroomID := topicSplit[1]
 
-		// Update the delivered report using the common function.
-		if err := UpdateDeliveredDR(redisClient, wsServerParent, chatroomID, conversationKey, deliveredDeviceID, senderUUID, deliveredUUID, deliveredDR.CommunityID); err != nil {
+	readUUID := c.GetHeader(constant.HeadersMemberID)
+	if readUUID == "" || readUUID == "null" {
+		api.GeneralUnauthorizedError(c, common.ErrorUserUUIDMissing)
+		return
+	}
+
+	readDeviceID := c.GetHeader(constant.HeadersDeviceID)
+
+	// Get the min_timestamp and max_timestamp from the body.
+	var publishReadDRRequest PublishReadDRRequest
+	if err := c.ShouldBindJSON(&publishReadDRRequest); err != nil {
+		api.GeneralBadRequestError(c, fmt.Sprintf(common.ErrorInvalidJSONFormat, err))
+		return
+	}
+
+	// Construct the Redis key for the chatroom delivery report.
+	chatroomKey := fmt.Sprintf(common.DRChatroomPrefix, chatroomID)
+
+	// Get the Redis client from the context.
+	redisClient := GetRedisClientFromContext(c)
+	wsServerParent := ws.GetWsServerParentFromContext(c)
+
+	// Step 1: Fetch all member values between min and max timestamps from the Redis key.
+	chatroomKeyMembers, err := FetchMembersFromZSet(redisClient, chatroomKey, publishReadDRRequest.MinTimestamp, publishReadDRRequest.MaxTimestamp)
+	if err != nil {
+		api.GeneralAPIError(c, err.Error())
+		return
+	}
+
+	// Step 2: Iterate over each member value, which corresponds to conversation IDs.
+	for _, chatroomKeyMember := range chatroomKeyMembers {
+		// Construct the key for the conversation delivery report.
+		conversationKey := fmt.Sprintf("%s", chatroomKeyMember.Member)
+
+		// Update the read report using the common function.
+		if err := UpdateReadDR(redisClient, wsServerParent, readUUID, readDeviceID, publishReadDRRequest.CommunityID, chatroomID, conversationKey); err != nil {
 			log.Println(err)
 		}
 	}
