@@ -4,6 +4,7 @@ import "time"
 
 const (
 	RedisClient                                = "redis_client"
+	RedisDefaultDB                             = 0
 	PostgresClient                             = "postgres_client"
 	ReadBufferSizeDefault                      = 4096
 	WriteBufferSizeDefault                     = 4096
@@ -93,4 +94,13 @@ const (
 	DotEnvVarBaseUrlCaravan       = "CARAVAN_BASE_URL"
 	DotEnvVarBaseUrlSwarm         = "SWARM_BASE_URL"
 	DotEnvVarCacheRedisDsn        = "REDIS_DSN"
+	DotEnvServerEnviornment       = "SERVER_ENVIRONMENT"
+	DotEnvVarCacheRedisPassword   = "REDIS_PASSWORD"
+)
+
+const (
+	ServerEnviornmentDevelopment = "development"
+	ServerEnviornmentStaging     = "beta"
+	ServerEnviornmentProduction  = "production"
+	ServerEnviornmentLoad        = "load"
 )
