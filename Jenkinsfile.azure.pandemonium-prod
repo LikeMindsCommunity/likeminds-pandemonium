@@ -63,7 +63,7 @@ pipeline {
         stage ('Build Image') {
             steps {
                 sh '''
-                    docker build -f Dockerfile.pandemonium-prod -t $ACR_LOGIN_SERVER/likeminds-real-time/pandemonium-production:pandemonium-V$BUILD_NUMBER .
+                    docker build -f Dockerfile.pandemonium -t $ACR_LOGIN_SERVER/likeminds-real-time/pandemonium-production:pandemonium-V$BUILD_NUMBER .
                 '''
             }
         }
