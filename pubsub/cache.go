@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"likeminds-pandemonium/common"
@@ -18,20 +17,12 @@ var ctx = context.Background()
 func InitRedisClient() *redis.Client {
 	var redisClient *redis.Client = nil
 
-	if common.GoDotEnvVariable(common.DotEnvServerEnviornment) == common.ServerEnviornmentLoad {
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:      common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
-			Password:  common.GoDotEnvVariable(common.DotEnvVarCacheRedisPassword),
-			TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12},
-			DB:        common.RedisDefaultDB, // use default DB
-		})
-	} else {
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:     common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
-			Password: "",                    // no password set
-			DB:       common.RedisDefaultDB, // use default DB
-		})
-	}
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:     common.GoDotEnvVariable(common.DotEnvVarCacheRedisDsn),
+		Password: common.GoDotEnvVariable(common.DotEnvVarCacheRedisPassword),
+		// TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12},
+		DB: common.RedisDefaultDB, // use default DB
+	})
 
 	ctx := context.Background()
 	if err := redisClient.Ping(ctx).Err(); err != nil {
