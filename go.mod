@@ -1,4 +1,4 @@
-module likeminds-pandemonium
+module github.com/LikeMindsCommunity/likeminds-pandemonium
 
 go 1.22
 

@@ -1,6 +1,6 @@
 package requestresponse
 
-import "likeminds-pandemonium/api/constant"
+import "github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
 
 type SwarmCreateWidgetRequestBody struct {
 	ParentEntityID   string      `json:"parent_entity_id,omitempty"`

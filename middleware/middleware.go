@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"likeminds-pandemonium/common"
-	"likeminds-pandemonium/ws"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/ws"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"

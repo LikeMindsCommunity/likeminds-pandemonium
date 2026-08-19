@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 	"io"
-	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/common"
 	"net/http"
 	"time"
 )

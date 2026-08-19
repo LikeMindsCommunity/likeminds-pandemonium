@@ -2,7 +2,7 @@ package helpers
 
 import (
 	"fmt"
-	"likeminds-pandemonium/api/repository"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/repository"
 )
 
 func ValidateUserRightInChatroom(chatroomID int, userID int, userRight string, isMemberAdminInCommunity bool) (bool, error) {

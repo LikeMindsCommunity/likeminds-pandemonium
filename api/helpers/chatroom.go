@@ -2,8 +2,8 @@ package helpers
 
 import (
 	"fmt"
-	"likeminds-pandemonium/api/models"
-	"likeminds-pandemonium/api/repository"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/models"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/repository"
 )
 
 func GetChatroomByID(chatroomID int64) (*models.Chatroom, error) {

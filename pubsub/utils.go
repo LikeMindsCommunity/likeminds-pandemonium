@@ -2,9 +2,9 @@ package pubsub
 
 import (
 	"errors"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	"likeminds-pandemonium/common"
 	"strings"
 )
 
