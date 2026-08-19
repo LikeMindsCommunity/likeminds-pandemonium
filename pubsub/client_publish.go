@@ -3,10 +3,10 @@ package pubsub
 import (
 	"encoding/json"
 	"fmt"
-	"likeminds-pandemonium/api"
-	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/common"
-	"likeminds-pandemonium/ws"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/ws"
 	"log"
 
 	"github.com/gin-gonic/gin"

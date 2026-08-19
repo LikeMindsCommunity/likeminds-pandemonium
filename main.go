@@ -1,13 +1,13 @@
 package main
 
 import (
-	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/common"
-	"likeminds-pandemonium/database"
-	"likeminds-pandemonium/middleware"
-	"likeminds-pandemonium/pubsub"
-	"likeminds-pandemonium/web"
-	"likeminds-pandemonium/ws"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/database"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/middleware"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/pubsub"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/web"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/ws"
 	"log"
 
 	"github.com/gin-gonic/gin"

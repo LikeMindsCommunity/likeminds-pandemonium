@@ -2,7 +2,7 @@ package utilities
 
 import (
 	"errors"
-	"likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 	"strings"
 )
 

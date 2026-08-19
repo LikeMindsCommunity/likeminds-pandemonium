@@ -2,7 +2,7 @@ package helpers
 
 import (
 	"fmt"
-	"likeminds-pandemonium/api/repository"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/repository"
 )
 
 func ValidateUserRightInCommunity(communityID int, userID int, rightID int) (bool, error) {

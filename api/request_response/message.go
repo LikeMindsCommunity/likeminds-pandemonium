@@ -1,7 +1,7 @@
 package requestresponse
 
 import (
-	"likeminds-pandemonium/api/models"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/models"
 )
 
 type CreateMessageRequest struct {

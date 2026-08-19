@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"likeminds-pandemonium/database"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/database"
 
 	"gorm.io/gorm"
 )

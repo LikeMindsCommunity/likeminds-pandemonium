@@ -2,7 +2,7 @@ package database
 
 import (
 	"fmt"
-	"likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 	"log"
 
 	"gorm.io/driver/postgres"

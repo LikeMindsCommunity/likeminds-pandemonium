@@ -3,7 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
-	"likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 
 	"log"
 	"time"

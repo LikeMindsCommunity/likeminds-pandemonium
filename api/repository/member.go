@@ -2,9 +2,9 @@ package repository
 
 import (
 	"fmt"
-	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/api/models"
-	"likeminds-pandemonium/database"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/models"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/database"
 
 	"gorm.io/gorm"
 )

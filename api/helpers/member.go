@@ -2,8 +2,8 @@ package helpers
 
 import (
 	"fmt"
-	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/api/repository"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/repository"
 )
 
 func GetMemberStateInCommunity(communityID int, userID int) (*int, error) {

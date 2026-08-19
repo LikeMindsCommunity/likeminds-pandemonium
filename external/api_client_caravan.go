@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 	"net/http"
 	"time"
 )

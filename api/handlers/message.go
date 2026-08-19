@@ -3,12 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"likeminds-pandemonium/api/constant"
-	"likeminds-pandemonium/api/helpers"
-	"likeminds-pandemonium/api/models"
-	requestresponse "likeminds-pandemonium/api/request_response"
-	"likeminds-pandemonium/api/utilities"
-	"likeminds-pandemonium/common"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/constant"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/helpers"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/models"
+	requestresponse "github.com/LikeMindsCommunity/likeminds-pandemonium/api/request_response"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/api/utilities"
+	"github.com/LikeMindsCommunity/likeminds-pandemonium/common"
 	"log"
 )
 
